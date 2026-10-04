@@ -1,8 +1,11 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../features/auth/data/auth_repository.dart';
+import '../../features/onboarding/data/avatar_repository.dart';
 import '../assets.dart';
 import '../theme.dart';
 
@@ -111,13 +114,15 @@ class _LanguageSwitcher extends StatelessWidget {
   }
 }
 
-class _ProfileButton extends StatelessWidget {
+class _ProfileButton extends ConsumerWidget {
   const _ProfileButton({this.onTap});
 
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final avatarPath = ref.watch(userProfileProvider).value?.avatarPath;
+
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -138,11 +143,37 @@ class _ProfileButton extends StatelessWidget {
               ],
             ),
             child: ClipOval(
-              child: Image.asset(AppImages.profile, fit: BoxFit.cover),
+              child: avatarPath == null
+                  ? Image.asset(AppImages.profile, fit: BoxFit.cover)
+                  : _StoredAvatar(path: avatarPath),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _StoredAvatar extends ConsumerWidget {
+  const _StoredAvatar({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final url = ref.watch(avatarUrlProvider(path));
+    return url.when(
+      data: (value) => Image.network(
+        value,
+        width: 32,
+        height: 32,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) =>
+            Image.asset(AppImages.profile, fit: BoxFit.cover),
+      ),
+      loading: () => Image.asset(AppImages.profile, fit: BoxFit.cover),
+      error: (error, stackTrace) =>
+          Image.asset(AppImages.profile, fit: BoxFit.cover),
     );
   }
 }

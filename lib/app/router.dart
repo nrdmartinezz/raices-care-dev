@@ -8,6 +8,7 @@ import '../features/auth/presentation/auth_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/care/presentation/chores_screen.dart';
 import '../features/home/presentation/home_screen.dart';
+import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/plants/presentation/add_plant_screen.dart';
 import '../features/plants/presentation/my_plants_screen.dart';
 import '../features/wisdom/presentation/wisdom_screen.dart';
@@ -53,6 +54,11 @@ abstract final class AddPlantRoute {
   static const path = '/add-plant';
 }
 
+abstract final class OnboardingRoute {
+  static const name = 'onboarding';
+  static const path = '/onboarding';
+}
+
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 /// Application routes.
@@ -62,8 +68,8 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 /// is deliberately outside the shell: it renders over the nav instead of
 /// beside it.
 ///
-/// Auth is gated here rather than in each screen, so no screen has to check
-/// for a session before it renders.
+/// Auth and onboarding are gated here rather than in each screen, so no
+/// screen has to check for a session or a finished profile before it renders.
 final routerProvider = Provider<GoRouter>((ref) {
   // go_router does not re-run `redirect` when a provider changes, so the auth
   // status is bridged to something it will listen to. Rebuilding the GoRouter
@@ -72,6 +78,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
   ref.onDispose(refresh.dispose);
   ref.listen(authStatusProvider, (_, _) => refresh.value++);
+  ref.listen(onboardingGateProvider, (_, _) => refresh.value++);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -83,13 +90,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onSplash = location == SplashRoute.path;
       final onAuth =
           location == SignInRoute.path || location == SignUpRoute.path;
+      final onOnboarding = location == OnboardingRoute.path;
 
       return switch (status) {
         // Hold on the splash until the session is known. Treating this as
         // signed out would flash the sign-in screen at a returning user.
         AuthStatus.unknown => onSplash ? null : SplashRoute.path,
         AuthStatus.signedOut => onAuth ? null : SignInRoute.path,
-        AuthStatus.signedIn => (onAuth || onSplash) ? HomeRoute.path : null,
+        AuthStatus.signedIn => switch (ref.read(onboardingGateProvider)) {
+          // The profile stream is the second thing to wait for. Sending a
+          // signed-in gardener home before it resolves would skip onboarding
+          // for anyone whose document is a moment behind the session.
+          OnboardingGate.pending => onSplash ? null : SplashRoute.path,
+          OnboardingGate.required => onOnboarding ? null : OnboardingRoute.path,
+          OnboardingGate.finished =>
+            (onAuth || onSplash || onOnboarding) ? HomeRoute.path : null,
+        },
       };
     },
     routes: [
@@ -151,6 +167,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: OnboardingRoute.path,
+        name: OnboardingRoute.name,
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: AddPlantRoute.path,
