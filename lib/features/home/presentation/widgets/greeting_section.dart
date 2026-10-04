@@ -4,8 +4,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../app/assets.dart';
 import '../../../../app/theme.dart';
+import '../../../auth/data/auth_repository.dart';
+import '../../../auth/domain/app_user.dart';
+import '../../../weather/data/weather_providers.dart';
+import '../../../weather/domain/garden_weather.dart';
 import '../../data/home_providers.dart';
-import '../../data/home_template_content.dart';
+import 'section_state.dart';
 
 /// Section 1: the date, greeting and next-ritual pill, above the weather strip.
 class GreetingSection extends ConsumerWidget {
@@ -68,11 +72,7 @@ class _RitualPill extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SvgPicture.asset(
-            AppIcons.morningWatering,
-            width: 16.5,
-            height: 16.5,
-          ),
+          SvgPicture.asset(AppIcons.morningWatering, width: 16.5, height: 16.5),
           const SizedBox(width: 6),
           Text(
             ref.watch(ritualPillProvider),
@@ -84,8 +84,36 @@ class _RitualPill extends ConsumerWidget {
   }
 }
 
-class _WeatherPillStrip extends StatelessWidget {
+class _WeatherPillStrip extends ConsumerWidget {
   const _WeatherPillStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weather = ref.watch(gardenWeatherProvider);
+    final unit =
+        ref.watch(userProfileProvider).value?.units.temperature ??
+        TemperatureUnit.fahrenheit;
+
+    return weather.when(
+      loading: () => const SectionSkeleton(rows: 1, height: 72),
+      error: (error, _) => SectionMessage(
+        title: error is WeatherLookupException
+            ? error.title
+            : 'Weather unavailable',
+        body: error is WeatherLookupException
+            ? error.message
+            : 'The forecast could not be loaded.',
+      ),
+      data: (reading) => _WeatherReading(reading: reading, unit: unit),
+    );
+  }
+}
+
+class _WeatherReading extends StatelessWidget {
+  const _WeatherReading({required this.reading, required this.unit});
+
+  final GardenWeather reading;
+  final TemperatureUnit unit;
 
   @override
   Widget build(BuildContext context) {
@@ -118,36 +146,42 @@ class _WeatherPillStrip extends StatelessWidget {
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
-                      HomeTemplateContent.temperature,
+                      formatTemperature(reading.temperatureCelsius, unit),
                       style: AppText.metric.copyWith(color: AppColors.ink),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      HomeTemplateContent.sky,
-                      style: AppText.labelMedium.copyWith(
-                        color: AppColors.body,
+                    if (reading.sky.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          reading.sky,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.labelMedium.copyWith(
+                            color: AppColors.body,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
-                Text(
-                  HomeTemplateContent.weatherNote,
-                  style: AppText.body.copyWith(color: AppColors.green),
-                ),
+                if (reading.place.isNotEmpty)
+                  Text(
+                    reading.place,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.body.copyWith(color: AppColors.green),
+                  ),
               ],
             ),
           ),
-          const _WeatherChip(
-            icon: AppIcons.weatherHumidity,
-            iconSize: Size(10.667, 13.333),
-            label: HomeTemplateContent.humidity,
-          ),
-          const SizedBox(width: 12),
-          const _WeatherChip(
-            icon: AppIcons.weatherUv,
-            iconSize: Size(13.333, 10.667),
-            label: HomeTemplateContent.uvIndex,
-          ),
+          if (reading.humidityPercent case final humidity?) ...[
+            const SizedBox(width: 12),
+            _WeatherChip(
+              icon: AppIcons.weatherHumidity,
+              iconSize: const Size(10.667, 13.333),
+              label: formatHumidity(humidity),
+            ),
+          ],
         ],
       ),
     );

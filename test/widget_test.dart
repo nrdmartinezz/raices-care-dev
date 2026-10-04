@@ -5,6 +5,8 @@ import 'package:raices/app/app.dart';
 import 'package:raices/features/auth/data/auth_repository.dart';
 import 'package:raices/features/home/data/home_providers.dart';
 import 'package:raices/features/plants/data/plant_repository.dart';
+import 'package:raices/features/weather/data/weather_providers.dart';
+import 'package:raices/features/weather/domain/garden_weather.dart';
 
 /// The app with every Firebase-backed provider stubbed out, so the shell can
 /// be pumped without an initialized Firebase app.
@@ -18,6 +20,17 @@ Widget _appWithEmptyGarden() => ProviderScope(
     userProfileProvider.overrideWith((ref) => Stream.value(null)),
     activePlantsProvider.overrideWith((ref) => Stream.value(const [])),
     todaysRemindersProvider.overrideWith((ref) => Stream.value(const [])),
+    // A fixed reading, so the strip never asks the device for a location.
+    gardenWeatherProvider.overrideWith(
+      (ref) => Future.value(
+        const GardenWeather(
+          temperatureCelsius: 22.2,
+          sky: 'Sunny',
+          place: 'Austin, TX',
+          humidityPercent: 48,
+        ),
+      ),
+    ),
   ],
   child: const RaicesApp(),
 );
@@ -41,6 +54,11 @@ void main() {
 
     expect(find.text('SATURDAY, OCTOBER 3'), findsOneWidget);
     expect(find.text('Good morning,\ngardener'), findsOneWidget);
+    expect(find.text('72°F'), findsOneWidget);
+    expect(find.text('Sunny'), findsOneWidget);
+    expect(find.text('Austin, TX'), findsOneWidget);
+    expect(find.text('48%'), findsOneWidget);
+    expect(find.text('UV 6'), findsNothing);
   });
 
   testWidgets('bottom nav switches between tabs', (tester) async {
