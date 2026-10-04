@@ -64,11 +64,12 @@ matches `google-services.json` against the `applicationId`, and the Android buil
 The emulator must be booted before Flutter will list it as a device. Flutter only supports
 64-bit Android images, so the virtual device must use an `x86_64` system image.
 
-Start the emulator. The software graphics flag is required on this machine, because booting on
-the host GPU path fails:
+Start the emulator on the host GPU, and skip quick boot. Software rendering (`-gpu swiftshader_indirect`)
+stalls this machine: `opengl32sw` is missing, and restoring the quick-boot snapshot exits before adb
+comes online.
 
 ```powershell
-& "$env:ANDROID_HOME\emulator\emulator.exe" -avd raices_phone_64 -no-metrics -gpu swiftshader_indirect
+& "$env:ANDROID_HOME\emulator\emulator.exe" -avd raices_phone_64 -no-metrics -gpu host -no-snapshot-load
 ```
 
 Wait for the Android home screen, then confirm the device is online:

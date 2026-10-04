@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/assets.dart';
 import '../../../app/theme.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
@@ -429,19 +430,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.surfaceBlush,
                   shape: BoxShape.circle,
-                  image: _photo == null
-                      ? null
-                      : DecorationImage(
-                          image: MemoryImage(_photo!.bytes),
-                          fit: BoxFit.cover,
-                        ),
+                  image: DecorationImage(
+                    image: _photo == null
+                        ? const AssetImage(AppImages.profile)
+                        : MemoryImage(_photo!.bytes),
+                    fit: BoxFit.cover,
+                  ),
                 ),
-                child: _photo == null
-                    ? const Icon(
-                        Icons.add_a_photo_outlined,
-                        color: AppColors.muted,
-                      )
-                    : null,
               ),
               const SizedBox(height: 6),
               Text(
