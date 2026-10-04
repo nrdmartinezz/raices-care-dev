@@ -1,3 +1,4 @@
+import { logger } from "firebase-functions";
 import { defineSecret } from "firebase-functions/params";
 
 /**
@@ -29,7 +30,7 @@ interface Measurement {
   deg_f?: number | null;
 }
 
-/** Shape of a record in `/plants` and `/plants/search`. Summaries only. */
+/** Shape of a record from `GET /plants/search`. Summaries only. */
 export interface TrefleSummary {
   id: number;
   slug: string;
@@ -115,8 +116,11 @@ class TrefleError extends Error {
 }
 
 async function request<T>(path: string, token: string): Promise<T> {
+  // Secrets pasted at the prompt often keep a trailing newline or a copied
+  // "Bearer " prefix. Either one makes Trefle reject an otherwise valid token.
+  const cleanToken = token.trim().replace(/^Bearer\s+/i, "");
   const separator = path.includes("?") ? "&" : "?";
-  const url = `${BASE_URL}${path}${separator}token=${encodeURIComponent(token)}`;
+  const url = `${BASE_URL}${path}${separator}token=${encodeURIComponent(cleanToken)}`;
 
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
@@ -124,6 +128,10 @@ async function request<T>(path: string, token: string): Promise<T> {
 
   if (!response.ok) {
     // The URL carries the token, so it must never reach a log line.
+    logger.warn("Trefle request failed", {
+      path,
+      status: response.status,
+    });
     throw new TrefleError(
       `Trefle request to ${path} failed with ${response.status}`,
       response.status,
@@ -133,16 +141,60 @@ async function request<T>(path: string, token: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-/** Searches by common or scientific name. Returns summaries, not growth data. */
+/**
+ * Searches with the Plants search endpoint:
+ * `GET /api/v1/plants/search?q=`.
+ *
+ * That `q` matches common names and scientific names. Everyday names are
+ * what people type, so a common-name hit is kept and listed first. A query
+ * with no common-name hit, such as a botanical name, keeps the full result.
+ */
 export async function searchTrefleSpecies(
   query: string,
   token: string,
 ): Promise<TrefleSummary[]> {
+  const term = query.trim();
   const payload = await request<{ data: TrefleSummary[] }>(
-    `/plants/search?q=${encodeURIComponent(query)}`,
+    `/plants/search?q=${encodeURIComponent(term)}`,
     token,
   );
-  return payload.data ?? [];
+  return preferCommonName(payload.data ?? [], term.toLowerCase());
+}
+
+/**
+ * Keeps matches whose common name contains the query, best match first.
+ * Returns every result when none of the common names match.
+ */
+function preferCommonName(
+  matches: TrefleSummary[],
+  term: string,
+): TrefleSummary[] {
+  const scored = matches.map((match) => ({
+    match,
+    score: commonNameScore(match.common_name, term),
+  }));
+  const named = scored.filter((entry) => entry.score > 0);
+  const pool = named.length > 0 ? named : scored;
+  pool.sort((left, right) => right.score - left.score);
+  return pool.map((entry) => entry.match);
+}
+
+/** Exact common name, then a name that starts with the query, then one that contains it. */
+function commonNameScore(commonName: string | null, term: string): number {
+  if (!commonName) {
+    return 0;
+  }
+  const name = commonName.toLowerCase();
+  if (name === term) {
+    return 3;
+  }
+  if (name.startsWith(term)) {
+    return 2;
+  }
+  if (name.includes(term)) {
+    return 1;
+  }
+  return 0;
 }
 
 /** Fetches the full record, including the `growth` block care rules need. */

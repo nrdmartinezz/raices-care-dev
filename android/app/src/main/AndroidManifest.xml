@@ -1,6 +1,4 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Coarse is enough: the forecast grid is about 2.5 km. -->
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Optional profile photo and plant cover photo. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />

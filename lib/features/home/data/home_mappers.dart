@@ -162,6 +162,7 @@ int careActionsToday(List<Plant> plants, {required DateTime now}) {
 GrowingPlant growingPlantFrom(Plant plant, {required DateTime now}) {
   final (badge, tone) = _statusBadge(plant);
   return GrowingPlant(
+    id: plant.id,
     coverPhotoPath: plant.coverPhotoPath,
     badge: badge,
     tone: tone,

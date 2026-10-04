@@ -118,6 +118,15 @@ class ZoneLookupException extends AppException {
   const ZoneLookupException(super.message, {super.cause, super.stackTrace});
 }
 
+/// The callable's own message, when it sent one worth showing.
+String? _functionMessage(FirebaseFunctionsException error) {
+  final message = error.message?.trim();
+  if (message == null || message.isEmpty) {
+    return null;
+  }
+  return message;
+}
+
 /// Normalizes anything thrown by a Firebase SDK into an [AppException].
 AppException mapFirebaseException(Object error, StackTrace stackTrace) {
   if (error is AppException) {
@@ -155,8 +164,13 @@ AppException mapFirebaseException(Object error, StackTrace stackTrace) {
       'permission-denied' => const PermissionDeniedException(),
       'not-found' => const NotFoundException(),
       'resource-exhausted' => const RateLimitedException(),
-      'unavailable' => const NetworkException(
-        'That service is unavailable right now.',
+      'unavailable' => NetworkException(
+        _functionMessage(error) ?? 'That service is unavailable right now.',
+      ),
+      'failed-precondition' => UnexpectedException(
+        _functionMessage(error) ?? 'The request failed.',
+        error,
+        stackTrace,
       ),
       _ => UnexpectedException(
         error.message ?? 'The request failed.',

@@ -108,3 +108,13 @@ final activePlantsProvider = StreamProvider<List<Plant>>((ref) {
   }
   return ref.watch(plantRepositoryProvider).watchActivePlants();
 });
+
+/// One plant, watched rather than fetched: `onPlantCreated` fills in the
+/// care fields a moment after the document appears, and the profile should
+/// show them as they land.
+final plantProvider = StreamProvider.family<Plant?, String>((ref, plantId) {
+  if (ref.watch(currentUserIdProvider) == null) {
+    return Stream.value(null);
+  }
+  return ref.watch(plantRepositoryProvider).watchPlant(plantId);
+});

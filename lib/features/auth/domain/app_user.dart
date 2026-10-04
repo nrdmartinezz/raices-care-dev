@@ -41,7 +41,7 @@ enum VolumeUnit {
   );
 }
 
-/// Where the user gardens. Drives hardiness and, later, weather lookups.
+/// Where the user gardens. The ZIP drives hardiness and the weather lookup.
 class HomeLocation {
   const HomeLocation({
     this.countryCode,

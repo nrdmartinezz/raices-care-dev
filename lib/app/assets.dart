@@ -28,6 +28,58 @@ abstract final class AppIcons {
   static const navChores = 'assets/icons/nav_chores.svg';
   static const navWisdom = 'assets/icons/nav_wisdom.svg';
 
+  /// The add-plant flow and the plant profile share this header.
+  static const flowBack = 'assets/icons/flow_back.svg';
+  static const flowBell = 'assets/icons/flow_bell.svg';
+
+  // Step 1, searching for a species.
+  static const searchGlass = 'assets/icons/search_glass.svg';
+  static const searchClear = 'assets/icons/search_clear.svg';
+  static const hintSparkles = 'assets/icons/hint_sparkles.svg';
+  static const recentClock = 'assets/icons/recent_clock.svg';
+  static const recentHistory = 'assets/icons/recent_history.svg';
+  static const suggestionSparkles = 'assets/icons/suggestion_sparkles.svg';
+  static const suggestionPaw = 'assets/icons/suggestion_paw.svg';
+  static const resultSelectedCheck = 'assets/icons/result_selected_check.svg';
+  static const resultChevron = 'assets/icons/result_chevron.svg';
+  static const resultChevronSelected =
+      'assets/icons/result_chevron_selected.svg';
+  static const selectionCheck = 'assets/icons/selection_check.svg';
+  static const ctaArrowRight = 'assets/icons/cta_arrow_right.svg';
+
+  // Step 2, setting the plant up. The garden glyphs are tinted at the call
+  // site because each one is drawn in two states.
+  static const setupChangePencil = 'assets/icons/setup_change_pencil.svg';
+  static const gardenIndoor = 'assets/icons/garden_indoor.svg';
+  static const gardenBackyard = 'assets/icons/garden_backyard.svg';
+  static const gardenFrontyard = 'assets/icons/garden_frontyard.svg';
+  static const gardenBalcony = 'assets/icons/garden_balcony.svg';
+  static const gardenSelectedCheck = 'assets/icons/garden_selected_check.svg';
+  static const setupCamera = 'assets/icons/setup_camera.svg';
+  static const setupCircleCheck = 'assets/icons/setup_circle_check.svg';
+  static const ctaSprout = 'assets/icons/cta_sprout.svg';
+
+  // The plant profile.
+  static const profileAddedCheck = 'assets/icons/profile_added_check.svg';
+  static const profileDismiss = 'assets/icons/profile_dismiss.svg';
+  static const statGarden = 'assets/icons/stat_garden.svg';
+  static const statStage = 'assets/icons/stat_stage.svg';
+  static const actionLogWatering = 'assets/icons/action_log_watering.svg';
+  static const actionAddNote = 'assets/icons/action_add_note.svg';
+  static const nextCareHeading = 'assets/icons/next_care_heading.svg';
+  static const nextCareDroplet = 'assets/icons/next_care_droplet.svg';
+  static const careGuideHeading = 'assets/icons/care_guide_heading.svg';
+  static const careLight = 'assets/icons/care_light.svg';
+  static const careWatering = 'assets/icons/care_watering.svg';
+  static const careChevron = 'assets/icons/care_chevron.svg';
+  static const upcomingHeading = 'assets/icons/upcoming_heading.svg';
+  static const taskWater = 'assets/icons/task_water.svg';
+  static const taskFertilize = 'assets/icons/task_fertilize.svg';
+  static const taskPest = 'assets/icons/task_pest.svg';
+  static const journalHeading = 'assets/icons/journal_heading.svg';
+  static const journalChevron = 'assets/icons/journal_chevron.svg';
+  static const ctaPlus = 'assets/icons/cta_plus.svg';
+
   static const authBadge = 'assets/icons/auth_badge.svg';
   static const fieldEmail = 'assets/icons/field_email.svg';
   static const fieldPassword = 'assets/icons/field_password.svg';

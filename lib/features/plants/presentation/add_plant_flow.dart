@@ -1,85 +1,113 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../app/assets.dart';
+import '../../../app/shell/flow_header.dart';
 import '../../../app/theme.dart';
 import '../../../core/errors/app_exception.dart';
-import '../../auth/presentation/widgets/auth_primary_button.dart';
 import '../../photos/data/photo_repository.dart';
 import '../../photos/presentation/photo_picker.dart';
 import '../data/plant_repository.dart';
+import '../data/recent_searches.dart';
 import '../data/species_repository.dart';
-import '../domain/care_profile.dart';
+import '../domain/garden_spot.dart';
 import '../domain/plant.dart';
 
-/// Search, resolve, then create. Shared by onboarding and `/add-plant`.
+/// The two steps of adding a plant: choose a species, then set it up.
 ///
-/// [speciesRepository.resolve] runs when a result is chosen, before
-/// [PlantRepository.createPlant], so `onPlantCreated` can seed reminders.
-/// The UI does not wait for those reminders.
+/// Searching writes nothing. Picking a result and pressing continue runs
+/// [SpeciesRepository.resolve], which caches the species so `onPlantCreated`
+/// finds a care profile to seed reminders from. Shared by onboarding and
+/// `/add-plant`.
 class AddPlantFlow extends ConsumerStatefulWidget {
   const AddPlantFlow({
     super.key,
     required this.explain,
-    this.eyebrow = 'NEW SPROUT',
-    this.title = 'Add a plant',
-    this.onClose,
+    this.eyebrow = 'ADD TO YOUR LIVING CATALOG',
+    this.title = 'Find your next green companion',
+    this.showProgress = true,
     this.onCreated,
     this.onSkip,
+    this.onStepChanged,
   });
 
-  /// Beginners get one sentence on light and on location.
+  /// Beginners get one sentence on each choice.
   final bool explain;
   final String eyebrow;
   final String title;
-  final VoidCallback? onClose;
 
-  /// After the plant document is written. Onboarding finishes the profile
-  /// here; the add-plant route leaves.
-  final Future<void> Function()? onCreated;
+  /// False where the host already shows its own steps, as onboarding does.
+  final bool showProgress;
+
+  /// After the plant document is written, with the new plant's id. Onboarding
+  /// finishes the profile here; the add-plant route opens the plant.
+  final Future<void> Function(String plantId)? onCreated;
 
   /// Onboarding only. Leaves without creating a plant.
   final Future<void> Function()? onSkip;
 
+  /// One-based step, so the host can title its header.
+  final ValueChanged<int>? onStepChanged;
+
   @override
-  ConsumerState<AddPlantFlow> createState() => _AddPlantFlowState();
+  ConsumerState<AddPlantFlow> createState() => AddPlantFlowState();
 }
 
-enum _Phase { search, details }
+enum _Phase { search, setup }
 
-class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
+class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
   static const _uuid = Uuid();
 
   final _query = TextEditingController();
-  final _nickname = TextEditingController();
 
   var _phase = _Phase.search;
   var _busy = false;
   var _resolving = false;
   var _searched = false;
-  var _sparse = false;
-  var _plantSaved = false;
   String? _error;
+  String? _searchedTerm;
   String? _attribution;
   String? _speciesId;
   String? _plantId;
   String? _coverPath;
   List<SpeciesCandidate> _results = const [];
-  SpeciesCandidate? _candidate;
+  SpeciesCandidate? _selected;
   PickedGardenPhoto? _photo;
-  LocationType? _location;
-  GrowingMethod? _method;
-  SunExposure? _light;
+  GardenSpot? _garden;
+  PlantAgeStage? _stage;
 
   @override
   void dispose() {
     _query.dispose();
-    _nickname.dispose();
     super.dispose();
   }
 
-  Future<void> _search() async {
-    final query = _query.text.trim();
+  /// True when the flow handled the back gesture itself.
+  bool goBack() {
+    if (_phase == _Phase.setup && !_busy) {
+      _toSearch();
+      return true;
+    }
+    return false;
+  }
+
+  void _setPhase(_Phase phase) {
+    setState(() => _phase = phase);
+    widget.onStepChanged?.call(phase == _Phase.search ? 1 : 2);
+  }
+
+  void _toSearch() {
+    setState(() => _error = null);
+    _setPhase(_Phase.search);
+  }
+
+  Future<void> _search([String? term]) async {
+    final query = (term ?? _query.text).trim();
+    if (term != null) {
+      _query.text = term;
+    }
     if (query.length < 2) {
       setState(() => _error = 'Enter at least 2 characters.');
       return;
@@ -94,10 +122,13 @@ class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
       if (!mounted) {
         return;
       }
+      ref.read(recentSearchesProvider.notifier).remember(query);
       setState(() {
         _results = result.candidates;
         _attribution = result.attribution;
         _searched = true;
+        _searchedTerm = query;
+        _selected = null;
       });
     } on AppException catch (error) {
       if (mounted) {
@@ -110,32 +141,46 @@ class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
     }
   }
 
-  Future<void> _choose(SpeciesCandidate candidate) async {
+  void _clearQuery() {
+    _query.clear();
+    setState(() {
+      _results = const [];
+      _searched = false;
+      _searchedTerm = null;
+      _selected = null;
+      _error = null;
+    });
+  }
+
+  /// Caches the chosen species, then moves to setup.
+  Future<void> _continueToSetup() async {
+    final candidate = _selected;
+    if (candidate == null) {
+      setState(() => _error = 'Choose a plant to continue.');
+      return;
+    }
+
     setState(() {
       _busy = true;
       _resolving = true;
       _error = null;
     });
     try {
-      final species = ref.read(speciesRepositoryProvider);
-      final speciesId = await species.resolve(
-        speciesId: candidate.speciesId.isEmpty ? null : candidate.speciesId,
-        trefleSlug: candidate.trefleSlug,
-      );
-      final sparse = await _scheduleIsDefault(species, speciesId);
+      final speciesId = await ref
+          .read(speciesRepositoryProvider)
+          .resolve(
+            speciesId: candidate.speciesId.isEmpty ? null : candidate.speciesId,
+            trefleSlug: candidate.trefleSlug,
+          );
       if (!mounted) {
         return;
       }
-      _nickname.text = candidate.displayName;
       setState(() {
         _speciesId = speciesId;
-        _candidate = candidate;
-        _sparse = sparse;
-        _phase = _Phase.details;
         _plantId = null;
         _coverPath = null;
-        _plantSaved = false;
       });
+      _setPhase(_Phase.setup);
     } on AppException catch (error) {
       if (mounted) {
         setState(() => _error = error.message);
@@ -147,21 +192,6 @@ class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
           _resolving = false;
         });
       }
-    }
-  }
-
-  Future<bool> _scheduleIsDefault(
-    SpeciesRepository species,
-    String speciesId,
-  ) async {
-    try {
-      final profiles = await species.getCareProfiles(speciesId);
-      return profiles.any(
-        (CareProfile profile) =>
-            profile.tasks.any((task) => task.isDefaultCadence),
-      );
-    } on AppException {
-      return false;
     }
   }
 
@@ -182,24 +212,14 @@ class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
   }
 
   String? _validate() {
-    final name = _nickname.text.trim();
     if (_speciesId == null) {
-      return 'Choose a species first.';
+      return 'Choose a plant first.';
     }
-    if (name.isEmpty) {
-      return 'Give the plant a name.';
+    if (_garden == null) {
+      return 'Choose where it will grow.';
     }
-    if (name.length > 120) {
-      return 'Use a shorter name.';
-    }
-    if (_location == null) {
-      return 'Choose indoors or outdoors.';
-    }
-    if (_method == null) {
-      return 'Choose a pot or the ground.';
-    }
-    if (_light == null) {
-      return 'Choose the light it gets.';
+    if (_stage == null) {
+      return 'Choose how old it is.';
     }
     return null;
   }
@@ -216,11 +236,8 @@ class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
       _error = null;
     });
     try {
-      if (!_plantSaved) {
-        await _create();
-        _plantSaved = true;
-      }
-      await widget.onCreated?.call();
+      final plantId = await _create();
+      await widget.onCreated?.call(plantId);
     } on AppException catch (error) {
       if (mounted) {
         setState(() => _error = error.message);
@@ -232,16 +249,12 @@ class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
     }
   }
 
-  Future<void> _create() async {
+  Future<String> _create() async {
     final speciesId = _speciesId;
-    final location = _location;
-    final method = _method;
-    final light = _light;
-    if (speciesId == null ||
-        location == null ||
-        method == null ||
-        light == null) {
-      throw const MalformedDataException('Choose a species first.');
+    final garden = _garden;
+    final stage = _stage;
+    if (speciesId == null || garden == null || stage == null) {
+      throw const MalformedDataException('Choose a plant first.');
     }
 
     final plantId = _plantId ??= _uuid.v4();
@@ -265,16 +278,22 @@ class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
           Plant(
             id: plantId,
             speciesId: speciesId,
-            displayName: _nickname.text.trim(),
-            locationType: location,
-            growingMethod: method,
+            displayName: _selected?.displayName ?? 'My plant',
+            gardenId: garden.wire,
+            locationType: garden.locationType,
+            growingMethod: garden.growingMethod,
+            plantAgeStage: stage,
             container: PlantContainer(
-              isContainer: method == GrowingMethod.container,
+              isContainer: garden.growingMethod == GrowingMethod.container,
             ),
-            environment: PlantEnvironment(sunExposure: light),
+            // The flow does not ask after the plant's condition, and a plant
+            // someone just chose to keep is a healthy one until they say
+            // otherwise.
+            status: const PlantStatus(health: PlantHealth.healthy),
             coverPhotoPath: coverPath,
           ),
         );
+    return plantId;
   }
 
   Future<void> _skip() async {
@@ -300,54 +319,16 @@ class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.onClose != null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: _busy ? null : widget.onClose,
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                foregroundColor: AppColors.terracotta,
-              ),
-              child: Text(
-                'Close',
-                style: AppText.label.copyWith(color: AppColors.terracotta),
-              ),
-            ),
-          ),
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.eyebrow,
-                  style: AppText.eyebrow.copyWith(color: AppColors.green),
-                ),
-                const SizedBox(height: 2.5),
-                Text(
-                  widget.title,
-                  style: AppText.display.copyWith(color: AppColors.ink),
-                ),
-                const SizedBox(height: 16),
-                if (_phase == _Phase.search) _searchBody() else _detailsBody(),
-              ],
-            ),
-          ),
-        ),
+        if (widget.showProgress) ...[
+          FlowProgress(step: _phase == _Phase.search ? 1 : 2, stepCount: 3),
+          const SizedBox(height: AppSizes.sectionGap),
+        ],
+        if (_phase == _Phase.search) _searchBody() else _setupBody(),
         if (_error != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             _error!,
             style: AppText.body.copyWith(color: AppColors.terracottaBright),
-          ),
-        ],
-        if (_phase == _Phase.details) ...[
-          const SizedBox(height: 12),
-          AuthPrimaryButton(
-            label: 'Add plant',
-            isLoading: _busy,
-            onPressed: _busy ? null : _save,
           ),
         ],
         if (widget.onSkip != null) ...[
@@ -369,174 +350,201 @@ class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
     );
   }
 
+  // ---------------------------------------------------------------- step one
+
   Widget _searchBody() {
+    final recents = ref.watch(recentSearchesProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextField(
+        Text(
+          widget.eyebrow,
+          style: AppText.eyebrow.copyWith(color: AppColors.green),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          widget.title,
+          style: AppText.display.copyWith(color: AppColors.ink),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          "Search by the name you know. We'll help with the botanical details.",
+          style: AppText.bodyLarge.copyWith(color: AppColors.body),
+        ),
+        const SizedBox(height: AppSizes.sectionGap),
+        _SearchField(
           controller: _query,
           enabled: !_busy,
-          textInputAction: TextInputAction.search,
-          onSubmitted: (_) => _search(),
-          style: AppText.input.copyWith(color: AppColors.ink),
-          cursorColor: AppColors.terracotta,
-          decoration: _fieldDecoration('Search by name'),
+          onSubmitted: () => _search(),
+          onClear: _clearQuery,
         ),
         const SizedBox(height: 12),
-        AuthPrimaryButton(
-          label: 'Search',
-          isLoading: _busy && !_resolving,
-          onPressed: _busy ? null : _search,
+        Row(
+          children: [
+            SvgPicture.asset(AppIcons.hintSparkles, width: 14, height: 14),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Try "Swiss cheese plant" or "Monstera deliciosa"',
+                style: AppText.caption.copyWith(color: AppColors.body),
+              ),
+            ),
+          ],
         ),
+        const SizedBox(height: 12),
+        _PrimaryAction(
+          label: 'Search',
+          icon: AppIcons.searchGlass,
+          isLoading: _busy && !_resolving,
+          onPressed: _busy ? null : () => _search(),
+        ),
+        if (recents.isNotEmpty || !_searched) ...[
+          const SizedBox(height: AppSizes.sectionGap),
+          _SuggestionsSection(
+            recents: recents,
+            onPick: _busy ? null : (term) => _search(term),
+            onClear: recents.isEmpty
+                ? null
+                : () => ref.read(recentSearchesProvider.notifier).clear(),
+          ),
+        ],
         if (_resolving) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSizes.sectionGap),
           Text(
             'Looking up care advice…',
             style: AppText.body.copyWith(color: AppColors.body),
           ),
         ],
-        const SizedBox(height: 16),
-        if (_searched && _results.isEmpty)
-          Text(
-            'No matches. Try a botanical name.',
-            style: AppText.body.copyWith(color: AppColors.body),
-          ),
-        for (final candidate in _results) ...[
-          _ResultTile(
-            candidate: candidate,
-            onTap: _busy ? null : () => _choose(candidate),
-          ),
-          const SizedBox(height: 8),
+        if (_searched) ...[
+          const SizedBox(height: AppSizes.sectionGap),
+          _ResultsHeading(term: _searchedTerm ?? '', count: _results.length),
+          const SizedBox(height: 12),
+          if (_results.isEmpty)
+            Text(
+              'No matches. Try the everyday name, like tomato or basil.',
+              style: AppText.bodyLarge.copyWith(color: AppColors.body),
+            ),
+          for (final candidate in _results) ...[
+            _ResultCard(
+              candidate: candidate,
+              isSelected: candidate.trefleSlug == _selected?.trefleSlug &&
+                  candidate.scientificName == _selected?.scientificName,
+              onTap: _busy
+                  ? null
+                  : () => setState(() {
+                      _selected = candidate;
+                      _error = null;
+                    }),
+            ),
+            const SizedBox(height: 12),
+          ],
         ],
-        if (_attribution != null && _attribution!.isNotEmpty) ...[
-          const SizedBox(height: 8),
+        if (_selected case final selected?) ...[
+          const SizedBox(height: 4),
+          _SelectionFooter(
+            name: selected.displayName,
+            isLoading: _busy,
+            onContinue: _busy ? null : _continueToSetup,
+          ),
+        ],
+        if (_attribution case final attribution?
+            when attribution.isNotEmpty) ...[
+          const SizedBox(height: 12),
           Text(
-            _attribution!,
-            style: AppText.body.copyWith(color: AppColors.muted),
+            attribution,
+            style: AppText.caption.copyWith(color: AppColors.muted),
           ),
         ],
       ],
     );
   }
 
-  Widget _detailsBody() {
-    final candidate = _candidate;
+  // ---------------------------------------------------------------- step two
+
+  Widget _setupBody() {
+    final selected = _selected;
+    final garden = _garden;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (!_plantSaved)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: _busy
-                  ? null
-                  : () => setState(() => _phase = _Phase.search),
-              style: TextButton.styleFrom(padding: EdgeInsets.zero),
-              child: Text(
-                'Choose a different species',
-                style: AppText.label.copyWith(color: AppColors.terracotta),
-              ),
-            ),
+        if (selected != null)
+          _SelectedSummary(
+            candidate: selected,
+            onChange: _busy ? null : _toSearch,
           ),
-        if (candidate != null) ...[
-          Text(
-            candidate.displayName,
-            style: AppText.plantName.copyWith(color: AppColors.ink),
-          ),
-          if (candidate.scientificName.isNotEmpty &&
-              candidate.scientificName != candidate.displayName)
-            Text(
-              candidate.scientificName,
-              style: AppText.bodyItalic.copyWith(color: AppColors.body),
-            ),
-          const SizedBox(height: 16),
-        ],
-        _BlushField(
-          label: 'Name',
-          controller: _nickname,
-          hintText: 'What you call it',
-          enabled: !_busy,
+        const SizedBox(height: AppSizes.sectionGap),
+        _SectionCopy(
+          title: 'Where will it grow?',
+          trailing: 'Required',
+          description: widget.explain
+              ? 'Choose a garden so care reminders match its conditions.'
+              : null,
         ),
-        const SizedBox(height: 16),
-        _ChoiceLabel('Where it lives'),
-        if (widget.explain) ...[
-          const SizedBox(height: 4),
-          Text(
-            'Indoors stays out of frost. Outdoors follows the zone you saved.',
-            style: AppText.body.copyWith(color: AppColors.body),
-          ),
-        ],
-        const SizedBox(height: 8),
-        _Pair(
-          left: 'Indoors',
-          right: 'Outdoors',
-          leftSelected: _location == LocationType.indoor,
-          rightSelected: _location == LocationType.outdoor,
-          onLeft: _busy
+        const SizedBox(height: 12),
+        _GardenGrid(
+          selected: garden,
+          onSelect: _busy
               ? null
-              : () => setState(() => _location = LocationType.indoor),
-          onRight: _busy
-              ? null
-              : () => setState(() => _location = LocationType.outdoor),
+              : (spot) => setState(() {
+                  _garden = spot;
+                  _error = null;
+                }),
         ),
-        const SizedBox(height: 16),
-        const _ChoiceLabel('Pot or ground'),
-        const SizedBox(height: 8),
-        _Pair(
-          left: 'Pot',
-          right: 'In the ground',
-          leftSelected: _method == GrowingMethod.container,
-          rightSelected: _method == GrowingMethod.inGround,
-          onLeft: _busy
-              ? null
-              : () => setState(() => _method = GrowingMethod.container),
-          onRight: _busy
-              ? null
-              : () => setState(() => _method = GrowingMethod.inGround),
+        const SizedBox(height: AppSizes.sectionGap),
+        const _SectionCopy(
+          title: 'How old is your plant?',
+          trailing: 'Required',
+          description: 'An estimate is perfectly fine.',
         ),
-        const SizedBox(height: 16),
-        _ChoiceLabel('Light'),
-        if (widget.explain) ...[
-          const SizedBox(height: 4),
-          Text(
-            'Choose the light it actually gets where it sits.',
-            style: AppText.body.copyWith(color: AppColors.body),
-          ),
-        ],
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        const SizedBox(height: 12),
+        _StageGrid(
+          selected: _stage,
+          onSelect: _busy
+              ? null
+              : (stage) => setState(() {
+                  _stage = stage;
+                  _error = null;
+                }),
+        ),
+        const SizedBox(height: AppSizes.sectionGap),
+        const _SectionCopy(
+          title: 'Add your own picture',
+          optional: true,
+          description: 'A first photo makes growth changes easier to notice.',
+        ),
+        const SizedBox(height: 12),
+        _PhotoWell(photo: _photo, onTap: _busy ? null : _pickPhoto),
+        const SizedBox(height: 12),
+        Row(
           children: [
-            for (final option in _lights)
-              _LightChip(
-                label: option.$2,
-                selected: _light == option.$1,
-                onTap: _busy ? null : () => setState(() => _light = option.$1),
+            SvgPicture.asset(AppIcons.setupCircleCheck, width: 14, height: 14),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'You can add or update this later',
+                style: AppText.caption.copyWith(color: AppColors.green),
               ),
+            ),
           ],
         ),
-        const SizedBox(height: 16),
-        const _ChoiceLabel('Photo'),
-        const SizedBox(height: 4),
-        Text('Optional.', style: AppText.body.copyWith(color: AppColors.muted)),
-        const SizedBox(height: 8),
-        _PhotoWell(photo: _photo, onTap: _busy ? null : _pickPhoto),
-        if (_sparse) ...[
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSizes.cardPadding),
-            decoration: BoxDecoration(
-              color: AppColors.amber,
-              borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-            ),
-            child: Text(
-              'This schedule is a starting default. The species record '
-              'did not have enough detail for a custom cadence.',
-              style: AppText.body.copyWith(color: AppColors.amberInk),
-            ),
+        const SizedBox(height: AppSizes.sectionGap),
+        _PrimaryAction(
+          label: selected == null
+              ? 'Add to my profile'
+              : 'Add ${_firstWord(selected.displayName)} to my profile',
+          icon: AppIcons.ctaSprout,
+          isLoading: _busy,
+          onPressed: _busy ? null : _save,
+        ),
+        if (garden != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            "Next, we'll build a care rhythm for your "
+            '${_gardenCopy[garden]!.label} garden.',
+            textAlign: TextAlign.center,
+            style: AppText.caption.copyWith(color: AppColors.body),
           ),
         ],
       ],
@@ -544,39 +552,288 @@ class _AddPlantFlowState extends ConsumerState<AddPlantFlow> {
   }
 }
 
-const _lights = <(SunExposure, String)>[
-  (SunExposure.fullSun, 'Full sun'),
-  (SunExposure.partialSun, 'Partial sun'),
-  (SunExposure.partialShade, 'Partial shade'),
-  (SunExposure.fullShade, 'Shade'),
-  (SunExposure.brightIndirect, 'Bright indirect'),
-  (SunExposure.lowLight, 'Low light'),
+String _firstWord(String value) {
+  final trimmed = value.trim();
+  final space = trimmed.indexOf(' ');
+  return space == -1 ? trimmed : trimmed.substring(0, space);
+}
+
+/// Label, second line and glyph for each garden. Kept out of [GardenSpot] so
+/// the domain does not reach for assets.
+const _gardenCopy = <GardenSpot, ({String label, String hint, String icon})>{
+  GardenSpot.indoor: (
+    label: 'Indoor',
+    hint: 'A room, on a sill or a shelf',
+    icon: AppIcons.gardenIndoor,
+  ),
+  GardenSpot.backyard: (
+    label: 'Backyard',
+    hint: 'Open air, afternoon sun',
+    icon: AppIcons.gardenBackyard,
+  ),
+  GardenSpot.frontyard: (
+    label: 'Frontyard',
+    hint: 'Porch, morning light',
+    icon: AppIcons.gardenFrontyard,
+  ),
+  GardenSpot.balcony: (
+    label: 'Balcony',
+    hint: 'High light, breezy',
+    icon: AppIcons.gardenBalcony,
+  ),
+};
+
+/// Starting points for someone with an empty search box. Common houseplants
+/// and kitchen-garden staples, so the catalog answers with something.
+const _suggestions = <({String label, String icon})>[
+  (label: 'Monstera', icon: AppIcons.suggestionSparkles),
+  (label: 'Snake plant', icon: AppIcons.suggestionPaw),
+  (label: 'Tomato', icon: AppIcons.suggestionSparkles),
+  (label: 'Basil', icon: AppIcons.suggestionPaw),
+  (label: 'Aloe', icon: AppIcons.suggestionSparkles),
 ];
 
-InputDecoration _fieldDecoration(String hint) => InputDecoration(
-  isDense: true,
-  filled: true,
-  fillColor: AppColors.surfaceBlush,
-  hintText: hint,
-  hintStyle: AppText.input.copyWith(color: AppColors.muted),
-  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-  border: _border(),
-  enabledBorder: _border(),
-  disabledBorder: _border(),
-  focusedBorder: _border(AppColors.terracotta),
-);
+const _stageCopy = <PlantAgeStage, ({String label, String hint})>{
+  PlantAgeStage.seed: (label: 'Seed', hint: 'Not up yet'),
+  PlantAgeStage.seedling: (label: 'Seedling', hint: 'First few leaves'),
+  PlantAgeStage.youngEstablishing: (
+    label: 'Young',
+    hint: 'Growing, still settling in',
+  ),
+  PlantAgeStage.mature: (label: 'Mature', hint: 'Full size, well rooted'),
+};
 
-InputBorder _border([Color? color]) => OutlineInputBorder(
-  borderRadius: BorderRadius.circular(AppSizes.imageRadius),
-  borderSide: color == null
-      ? BorderSide.none
-      : BorderSide(color: color, width: 1.5),
-);
+/// Garden labels for anything outside the flow that shows a plant's spot.
+String gardenSpotLabel(GardenSpot spot) => _gardenCopy[spot]!.label;
 
-class _ResultTile extends StatelessWidget {
-  const _ResultTile({required this.candidate, required this.onTap});
+/// Stage labels, for the same reason.
+String plantStageLabel(PlantAgeStage stage) =>
+    _stageCopy[stage]?.label ?? 'Unknown';
+
+// --------------------------------------------------------------- step one bits
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.enabled,
+    required this.onSubmitted,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final bool enabled;
+  final VoidCallback onSubmitted;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBlush,
+        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+        border: Border.all(color: AppColors.terracotta),
+        boxShadow: AppShadows.card,
+      ),
+      child: Row(
+        children: [
+          SvgPicture.asset(AppIcons.searchGlass, width: 18, height: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              enabled: enabled,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => onSubmitted(),
+              style: AppText.input.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w600,
+              ),
+              cursorColor: AppColors.terracotta,
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                hintText: 'Search by common name',
+                hintStyle: AppText.input.copyWith(color: AppColors.muted),
+              ),
+            ),
+          ),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, child) {
+              if (value.text.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              return Semantics(
+                button: true,
+                label: 'Clear search',
+                child: GestureDetector(
+                  onTap: onClear,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                    ),
+                    child: SvgPicture.asset(
+                      AppIcons.searchClear,
+                      width: 14,
+                      height: 14,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuggestionsSection extends StatelessWidget {
+  const _SuggestionsSection({
+    required this.recents,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  final List<String> recents;
+  final ValueChanged<String>? onPick;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SvgPicture.asset(AppIcons.recentClock, width: 18, height: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Recent & suggested',
+                style: AppText.title.copyWith(color: AppColors.ink),
+              ),
+            ),
+            if (onClear != null)
+              GestureDetector(
+                onTap: onClear,
+                child: Text(
+                  'Clear',
+                  style: AppText.label.copyWith(color: AppColors.terracotta),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final term in recents)
+              _ChoicePill(
+                label: term,
+                icon: AppIcons.recentHistory,
+                onTap: onPick == null ? null : () => onPick!(term),
+              ),
+            for (final suggestion in _suggestions)
+              _ChoicePill(
+                label: suggestion.label,
+                icon: suggestion.icon,
+                onTap: onPick == null ? null : () => onPick!(suggestion.label),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ChoicePill extends StatelessWidget {
+  const _ChoicePill({required this.label, required this.icon, this.onTap});
+
+  final String label;
+  final String icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surfaceBlush,
+      borderRadius: BorderRadius.circular(AppSizes.pill),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSizes.pill),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSizes.pill),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset(icon, width: 14, height: 14),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: AppText.fieldLabel.copyWith(color: AppColors.body),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultsHeading extends StatelessWidget {
+  const _ResultsHeading({required this.term, required this.count});
+
+  final String term;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Text(
+            'Plants matching "$term"',
+            style: AppText.title.copyWith(color: AppColors.ink),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          count == 1 ? '1 found' : '$count found',
+          style: AppText.label.copyWith(color: AppColors.green),
+        ),
+      ],
+    );
+  }
+}
+
+/// One candidate. The catalog search carries a name, a botanical name, a
+/// family and sometimes a photo; the description and care tags in the design
+/// only exist once a species has been resolved, so they are not shown here.
+class _ResultCard extends StatelessWidget {
+  const _ResultCard({
+    required this.candidate,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   final SpeciesCandidate candidate;
+  final bool isSelected;
   final VoidCallback? onTap;
 
   @override
@@ -586,35 +843,65 @@ class _ResultTile extends StatelessWidget {
         scientific.isNotEmpty && scientific != candidate.displayName;
 
     return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+      color: isSelected ? AppColors.surfaceWarm : AppColors.surface,
+      borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+        borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
         child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppSizes.cardPadding),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+            borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
+            border: Border.all(
+              color: isSelected ? AppColors.terracotta : AppColors.border,
+              width: isSelected ? 2 : 1,
+            ),
             boxShadow: AppShadows.card,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Text(
-                candidate.displayName,
-                style: AppText.title.copyWith(color: AppColors.ink),
+              _ResultPhoto(url: candidate.imageUrl, isSelected: isSelected),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            candidate.displayName,
+                            style: AppText.plantTitle.copyWith(
+                              color: AppColors.ink,
+                            ),
+                          ),
+                        ),
+                        SvgPicture.asset(
+                          isSelected
+                              ? AppIcons.resultChevronSelected
+                              : AppIcons.resultChevron,
+                          width: 17,
+                          height: 17,
+                        ),
+                      ],
+                    ),
+                    if (showScientific) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        scientific,
+                        style: AppText.bodyItalic.copyWith(
+                          color: AppColors.body,
+                        ),
+                      ),
+                    ],
+                    if (candidate.family case final family?
+                        when family.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      _Tag(label: family),
+                    ],
+                  ],
+                ),
               ),
-              if (showScientific)
-                Text(
-                  scientific,
-                  style: AppText.bodyItalic.copyWith(color: AppColors.body),
-                ),
-              if (candidate.family case final family?)
-                Text(
-                  family,
-                  style: AppText.body.copyWith(color: AppColors.muted),
-                ),
             ],
           ),
         ),
@@ -623,163 +910,559 @@ class _ResultTile extends StatelessWidget {
   }
 }
 
-class _ChoiceLabel extends StatelessWidget {
-  const _ChoiceLabel(this.text);
+class _ResultPhoto extends StatelessWidget {
+  const _ResultPhoto({required this.url, required this.isSelected});
 
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: AppText.fieldLabel.copyWith(color: AppColors.body),
-    );
-  }
-}
-
-class _Pair extends StatelessWidget {
-  const _Pair({
-    required this.left,
-    required this.right,
-    required this.leftSelected,
-    required this.rightSelected,
-    required this.onLeft,
-    required this.onRight,
-  });
-
-  final String left;
-  final String right;
-  final bool leftSelected;
-  final bool rightSelected;
-  final VoidCallback? onLeft;
-  final VoidCallback? onRight;
+  final String? url;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _SelectCard(
-            label: left,
-            selected: leftSelected,
-            onTap: onLeft,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _SelectCard(
-            label: right,
-            selected: rightSelected,
-            onTap: onRight,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SelectCard extends StatelessWidget {
-  const _SelectCard({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? AppColors.surfaceWarm : AppColors.surface,
-      borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-        child: Container(
-          height: 48,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-            border: Border.all(
-              color: selected ? AppColors.terracotta : Colors.transparent,
-              width: 1.5,
+    final address = url;
+    return SizedBox(
+      width: 94,
+      height: 112,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+              child: address == null || address.isEmpty
+                  ? const _PhotoPlaceholder()
+                  : Image.network(
+                      address,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const _PhotoPlaceholder(),
+                    ),
             ),
-            boxShadow: AppShadows.card,
           ),
-          child: Text(
-            label,
-            style: AppText.titleSemiBold.copyWith(color: AppColors.ink),
-          ),
-        ),
+          if (isSelected)
+            Positioned(
+              top: 7,
+              left: 7,
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: const BoxDecoration(
+                  color: AppColors.terracotta,
+                  shape: BoxShape.circle,
+                ),
+                child: SvgPicture.asset(
+                  AppIcons.resultSelectedCheck,
+                  width: 12,
+                  height: 12,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
-class _LightChip extends StatelessWidget {
-  const _LightChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
+/// Trefle often has no photo for a species, so the slot has to stand alone.
+class _PhotoPlaceholder extends StatelessWidget {
+  const _PhotoPlaceholder();
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected ? AppColors.terracotta : AppColors.surface,
-      borderRadius: BorderRadius.circular(AppSizes.pill),
-      child: InkWell(
-        onTap: onTap,
+    return ColoredBox(
+      color: AppColors.surfaceBlush,
+      child: Center(
+        child: SvgPicture.asset(AppIcons.growingSprout, width: 24, height: 24),
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.mintSoft,
         borderRadius: BorderRadius.circular(AppSizes.pill),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Text(
-            label,
-            style: AppText.label.copyWith(
-              color: selected ? AppColors.surface : AppColors.body,
-            ),
-          ),
-        ),
+      ),
+      child: Text(
+        label,
+        style: AppText.label.copyWith(color: AppColors.green),
       ),
     );
   }
 }
 
-class _BlushField extends StatelessWidget {
-  const _BlushField({
-    required this.label,
-    required this.controller,
-    this.hintText,
-    this.enabled = true,
+class _SelectionFooter extends StatelessWidget {
+  const _SelectionFooter({
+    required this.name,
+    required this.isLoading,
+    required this.onContinue,
   });
 
-  final String label;
-  final TextEditingController controller;
-  final String? hintText;
-  final bool enabled;
+  final String name;
+  final bool isLoading;
+  final VoidCallback? onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSizes.cardPadding),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceWarm,
+        borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SELECTED',
+                      style: AppText.eyebrow.copyWith(color: AppColors.green),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      name,
+                      style: AppText.cardTitle.copyWith(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: AppColors.mint,
+                  shape: BoxShape.circle,
+                ),
+                child: SvgPicture.asset(
+                  AppIcons.selectionCheck,
+                  width: 16,
+                  height: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _PrimaryAction(
+            label: 'Continue to plant setup',
+            icon: AppIcons.ctaArrowRight,
+            isLoading: isLoading,
+            onPressed: onContinue,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --------------------------------------------------------------- step two bits
+
+class _SelectedSummary extends StatelessWidget {
+  const _SelectedSummary({required this.candidate, required this.onChange});
+
+  final SpeciesCandidate candidate;
+  final VoidCallback? onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final scientific = candidate.scientificName;
+    final showScientific =
+        scientific.isNotEmpty && scientific != candidate.displayName;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceWarm,
+        borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 72,
+            height: 72,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+              child: candidate.imageUrl == null || candidate.imageUrl!.isEmpty
+                  ? const _PhotoPlaceholder()
+                  : Image.network(
+                      candidate.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const _PhotoPlaceholder(),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'YOUR NEW PLANT',
+                  style: AppText.eyebrow.copyWith(color: AppColors.green),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  candidate.displayName,
+                  style: AppText.plantTitle.copyWith(color: AppColors.ink),
+                ),
+                if (showScientific) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    scientific,
+                    style: AppText.bodyItalic.copyWith(color: AppColors.body),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Semantics(
+            button: true,
+            label: 'Choose a different plant',
+            child: GestureDetector(
+              onTap: onChange,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  shape: BoxShape.circle,
+                ),
+                child: SvgPicture.asset(
+                  AppIcons.setupChangePencil,
+                  width: 15,
+                  height: 15,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionCopy extends StatelessWidget {
+  const _SectionCopy({
+    required this.title,
+    this.trailing,
+    this.optional = false,
+    this.description,
+  });
+
+  final String title;
+  final String? trailing;
+  final bool optional;
+  final String? description;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppText.fieldLabel.copyWith(color: AppColors.body)),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          enabled: enabled,
-          textCapitalization: TextCapitalization.sentences,
-          style: AppText.input.copyWith(color: AppColors.ink),
-          cursorColor: AppColors.terracotta,
-          decoration: _fieldDecoration(hintText ?? ''),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: AppText.title.copyWith(color: AppColors.ink),
+              ),
+            ),
+            if (optional)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceBlush,
+                  borderRadius: BorderRadius.circular(AppSizes.pill),
+                ),
+                child: Text(
+                  'Optional',
+                  style: AppText.label.copyWith(color: AppColors.body),
+                ),
+              )
+            else if (trailing case final value?)
+              Text(
+                value,
+                style: AppText.label.copyWith(color: AppColors.terracotta),
+              ),
+          ],
         ),
+        if (description case final text?) ...[
+          const SizedBox(height: 4),
+          Text(
+            text,
+            style: AppText.bodyLarge.copyWith(color: AppColors.body),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _GardenGrid extends StatelessWidget {
+  const _GardenGrid({required this.selected, required this.onSelect});
+
+  final GardenSpot? selected;
+  final ValueChanged<GardenSpot>? onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    const spots = GardenSpot.values;
+    return Column(
+      children: [
+        for (var row = 0; row < spots.length; row += 2) ...[
+          if (row > 0) const SizedBox(height: 10),
+          // Intrinsic height so both cards in a row match the taller one.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var column = row; column < row + 2; column++) ...[
+                  if (column > row) const SizedBox(width: 10),
+                  Expanded(
+                    child: _GardenCard(
+                      spot: spots[column],
+                      isSelected: selected == spots[column],
+                      onTap: onSelect == null
+                          ? null
+                          : () => onSelect!(spots[column]),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _GardenCard extends StatelessWidget {
+  const _GardenCard({
+    required this.spot,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final GardenSpot spot;
+  final bool isSelected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final copy = _gardenCopy[spot]!;
+
+    return Material(
+      color: isSelected ? AppColors.mintSoft : AppColors.surface,
+      borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 112),
+          padding: const EdgeInsets.all(AppSizes.cardPadding),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
+            border: Border.all(
+              color: isSelected ? AppColors.green : AppColors.border,
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: AppShadows.card,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.green
+                          : AppColors.surfaceBlush,
+                      borderRadius: BorderRadius.circular(
+                        AppSizes.cardRadius,
+                      ),
+                    ),
+                    // One glyph per garden, tinted for the state it is in.
+                    child: SvgPicture.asset(
+                      copy.icon,
+                      width: 17,
+                      height: 17,
+                      colorFilter: ColorFilter.mode(
+                        isSelected ? AppColors.surface : AppColors.terracotta,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  _SelectionDot(isSelected: isSelected),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                copy.label,
+                style: AppText.subtitleBold.copyWith(color: AppColors.ink),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                copy.hint,
+                style: AppText.caption.copyWith(color: AppColors.body),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StageGrid extends StatelessWidget {
+  const _StageGrid({required this.selected, required this.onSelect});
+
+  final PlantAgeStage? selected;
+  final ValueChanged<PlantAgeStage>? onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final stages = _stageCopy.keys.toList(growable: false);
+    return Column(
+      children: [
+        for (var row = 0; row < stages.length; row += 2) ...[
+          if (row > 0) const SizedBox(height: 10),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var column = row; column < row + 2; column++) ...[
+                  if (column > row) const SizedBox(width: 10),
+                  Expanded(
+                    child: _StageCard(
+                      stage: stages[column],
+                      isSelected: selected == stages[column],
+                      onTap: onSelect == null
+                          ? null
+                          : () => onSelect!(stages[column]),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StageCard extends StatelessWidget {
+  const _StageCard({
+    required this.stage,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final PlantAgeStage stage;
+  final bool isSelected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final copy = _stageCopy[stage]!;
+
+    return Material(
+      color: isSelected ? AppColors.mintSoft : AppColors.surface,
+      borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
+        child: Container(
+          padding: const EdgeInsets.all(AppSizes.cardPadding),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
+            border: Border.all(
+              color: isSelected ? AppColors.green : AppColors.border,
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: AppShadows.card,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      copy.label,
+                      style: AppText.subtitleBold.copyWith(
+                        color: AppColors.ink,
+                      ),
+                    ),
+                  ),
+                  _SelectionDot(isSelected: isSelected),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                copy.hint,
+                style: AppText.caption.copyWith(color: AppColors.body),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionDot extends StatelessWidget {
+  const _SelectionDot({required this.isSelected});
+
+  final bool isSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 20,
+      height: 20,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isSelected ? AppColors.green : AppColors.surface,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isSelected ? AppColors.green : AppColors.border,
+        ),
+      ),
+      child: isSelected
+          ? SvgPicture.asset(
+              AppIcons.gardenSelectedCheck,
+              width: 11,
+              height: 11,
+            )
+          : null,
     );
   }
 }
@@ -792,39 +1475,174 @@ class _PhotoWell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final picked = photo;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: DottedBorderBox(
+        child: Row(
           children: [
             Container(
-              width: 72,
-              height: 72,
+              width: 54,
+              height: 54,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: AppColors.surfaceBlush,
-                shape: BoxShape.circle,
-                image: photo == null
+                borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+                image: picked == null
                     ? null
                     : DecorationImage(
-                        image: MemoryImage(photo!.bytes),
+                        image: MemoryImage(picked.bytes),
                         fit: BoxFit.cover,
                       ),
               ),
-              child: photo == null
-                  ? const Icon(
-                      Icons.add_a_photo_outlined,
-                      color: AppColors.muted,
+              child: picked == null
+                  ? SvgPicture.asset(
+                      AppIcons.setupCamera,
+                      width: 22,
+                      height: 22,
                     )
                   : null,
             ),
-            const SizedBox(height: 6),
-            Text(
-              photo == null ? 'Add a photo' : 'Change photo',
-              style: AppText.label.copyWith(color: AppColors.terracotta),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    picked == null
+                        ? 'Take or choose a photo'
+                        : 'Change this photo',
+                    style: AppText.subtitleBold.copyWith(color: AppColors.ink),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'JPG or PNG · the catalog photo stays as a backup',
+                    style: AppText.caption.copyWith(color: AppColors.body),
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 8),
+            SvgPicture.asset(AppIcons.resultChevron, width: 17, height: 17),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The dashed well around the photo picker.
+class DottedBorderBox extends StatelessWidget {
+  const DottedBorderBox({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedRectPainter(),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSizes.cardPadding),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DashedRectPainter extends CustomPainter {
+  static const _radius = AppSizes.cardRadius + 4;
+  static const _dash = 5.0;
+  static const _gap = 4.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.border
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    final outline = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Offset.zero & size,
+          const Radius.circular(_radius),
+        ),
+      );
+
+    for (final metric in outline.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = distance + _dash;
+        canvas.drawPath(
+          metric.extractPath(distance, next.clamp(0, metric.length)),
+          paint,
+        );
+        distance = next + _gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _PrimaryAction extends StatelessWidget {
+  const _PrimaryAction({
+    required this.label,
+    required this.icon,
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  final String label;
+  final String icon;
+  final bool isLoading;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      enabled: onPressed != null,
+      label: label,
+      child: GestureDetector(
+        onTap: isLoading ? null : onPressed,
+        behavior: HitTestBehavior.opaque,
+        child: Opacity(
+          opacity: onPressed == null && !isLoading ? 0.6 : 1,
+          child: Container(
+            width: double.infinity,
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.terracotta,
+              borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+              boxShadow: AppShadows.card,
+            ),
+            child: isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(AppColors.surface),
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset(icon, width: 18, height: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        label,
+                        style: AppText.title.copyWith(color: AppColors.surface),
+                      ),
+                    ],
+                  ),
+          ),
         ),
       ),
     );

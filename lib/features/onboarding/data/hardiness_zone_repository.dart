@@ -9,8 +9,8 @@ import '../domain/hardiness_zone.dart';
 /// Looks up a US ZIP in the 2023 PRISM hardiness listing.
 ///
 /// Responses are cached for the life of this repository. A miss or a network
-/// failure is not cached, so a retry can succeed. Coordinates in the file are
-/// ignored: a zone is never invented from latitude.
+/// failure is not cached, so a retry can succeed. The published centroid is
+/// kept for weather. The zone string itself is never invented from latitude.
 class HardinessZoneRepository {
   HardinessZoneRepository({required this._client});
 
@@ -87,11 +87,37 @@ class HardinessZoneRepository {
       throw _unavailable;
     }
 
+    final point = _point(decoded['coordinates']);
     return HardinessZone(
       postalCode: zip,
       zone: zone.toLowerCase(),
       temperatureRange: range.trim(),
+      latitude: point?.latitude,
+      longitude: point?.longitude,
     );
+  }
+
+  /// Both coordinates, or nothing. A half point is not a garden location.
+  ({double latitude, double longitude})? _point(Object? value) {
+    if (value is! Map) {
+      return null;
+    }
+    final latitude = _coordinate(value['lat']);
+    final longitude = _coordinate(value['lon']);
+    if (latitude == null || longitude == null) {
+      return null;
+    }
+    return (latitude: latitude, longitude: longitude);
+  }
+
+  double? _coordinate(Object? value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String) {
+      return double.tryParse(value);
+    }
+    return null;
   }
 }
 

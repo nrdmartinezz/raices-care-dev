@@ -32,8 +32,23 @@ const CACHE_TTL_DAYS = 90;
  */
 const ENFORCE_APP_CHECK = false;
 
+/**
+ * Callables are reached from the app with a Firebase ID token, which the
+ * functions framework verifies itself, so Cloud Run must let the request
+ * through to the container.
+ *
+ * Declared rather than left to the default: the CLI only applies the invoker
+ * binding when it is named, so an interrupted deploy once left `resolveSpecies`
+ * answering 403 HTML that the client could only report as `internal`.
+ */
+const PUBLIC_INVOKER = "public";
+
+function isFirestoreTimestamp(value: unknown): value is Timestamp {
+  return value instanceof Timestamp;
+}
+
 function isStale(lastSyncedAt: unknown): boolean {
-  if (!(lastSyncedAt instanceof Timestamp)) {
+  if (!isFirestoreTimestamp(lastSyncedAt)) {
     return true;
   }
   const ageDays =
@@ -52,7 +67,16 @@ function toHttpsError(error: unknown): HttpsError {
         "The plant catalog is rate limited right now. Try again shortly.",
       );
     }
-    return new HttpsError("unavailable", "The plant catalog is unavailable.");
+    if (error.status === 401 || error.status === 403) {
+      return new HttpsError(
+        "failed-precondition",
+        "The plant catalog rejected its access token.",
+      );
+    }
+    return new HttpsError(
+      "unavailable",
+      `The plant catalog is unavailable (${error.status}).`,
+    );
   }
   logger.error("Unexpected catalog failure", error);
   return new HttpsError("internal", "Could not reach the plant catalog.");
@@ -61,14 +85,16 @@ function toHttpsError(error: unknown): HttpsError {
 /**
  * Searches the catalog without writing anything.
  *
- * Returns summaries only — Trefle's list endpoints carry no growth data — so
- * the client shows candidates and then calls `resolveSpecies` for the pick.
+ * Calls Trefle `GET /plants/search` and prefers common-name matches.
+ * Returns summaries only — that endpoint carries no growth data — so the
+ * client shows candidates and then calls `resolveSpecies` for the pick.
  */
 export const searchSpeciesCatalog = onCall(
   {
     region: DEFAULT_REGION,
     secrets: [TREFLE_API_TOKEN],
     enforceAppCheck: ENFORCE_APP_CHECK,
+    invoker: PUBLIC_INVOKER,
   },
   async (request) => {
     if (!request.auth) {
@@ -118,6 +144,7 @@ export const resolveSpecies = onCall(
     region: DEFAULT_REGION,
     secrets: [TREFLE_API_TOKEN],
     enforceAppCheck: ENFORCE_APP_CHECK,
+    invoker: PUBLIC_INVOKER,
   },
   async (request) => {
     if (!request.auth) {
@@ -138,72 +165,74 @@ export const resolveSpecies = onCall(
       );
     }
 
-    // Serve from cache whenever we already hold a fresh copy.
-    if (speciesId) {
-      const cached = await db.doc(`species/${speciesId}`).get();
-      if (cached.exists && !isStale(cached.data()?.lastSyncedAt)) {
-        return { speciesId, cached: true };
-      }
-    }
-
-    let detail;
+    // The cache read, the mapping and the write are all inside the same guard:
+    // a Firestore or mapper failure here used to escape as a bare `internal`
+    // with nothing logged to say why.
     try {
-      detail = await fetchTrefleSpecies(
+      // Serve from cache whenever we already hold a fresh copy.
+      if (speciesId) {
+        const cached = await db.doc(`species/${speciesId}`).get();
+        if (cached.exists && !isStale(cached.data()?.lastSyncedAt)) {
+          return { speciesId, cached: true };
+        }
+      }
+
+      const detail = await fetchTrefleSpecies(
         trefleSlug ?? speciesId!,
         TREFLE_API_TOKEN.value(),
       );
-    } catch (error) {
-      throw toHttpsError(error);
-    }
 
-    const resolvedId = toSpeciesId(detail.scientific_name);
-    const speciesRef = db.doc(`species/${resolvedId}`);
-    const sourceRef = speciesRef
-      .collection("sources")
-      .doc(TREFLE_ATTRIBUTION.provider);
-    const profileRef = speciesRef
-      .collection("careProfiles")
-      .doc(DERIVED_CARE_PROFILE_ID);
+      const resolvedId = toSpeciesId(detail.scientific_name);
+      const speciesRef = db.doc(`species/${resolvedId}`);
+      const sourceRef = speciesRef
+        .collection("sources")
+        .doc(TREFLE_ATTRIBUTION.provider);
+      const profileRef = speciesRef
+        .collection("careProfiles")
+        .doc(DERIVED_CARE_PROFILE_ID);
 
-    const existing = await speciesRef.get();
-    const batch = db.batch();
+      const existing = await speciesRef.get();
+      const batch = db.batch();
 
-    batch.set(
-      speciesRef,
-      {
-        ...mapTrefleToSpecies(detail),
-        ...(existing.exists
-          ? {}
-          : { createdAt: FieldValue.serverTimestamp() }),
-      },
-      { merge: true },
-    );
-
-    batch.set(sourceRef, mapTrefleToSource(detail), { merge: true });
-
-    // Only derive a profile if nobody has hand-authored one, so curated care
-    // advice is never overwritten by the automatic rules.
-    const existingProfile = await profileRef.get();
-    if (!existingProfile.exists || existingProfile.data()?.isDerived === true) {
       batch.set(
-        profileRef,
+        speciesRef,
         {
-          ...deriveCareProfile(detail, TREFLE_ATTRIBUTION.provider),
-          updatedAt: FieldValue.serverTimestamp(),
-          schemaVersion: SCHEMA_VERSION,
+          ...mapTrefleToSpecies(detail),
+          ...(existing.exists
+            ? {}
+            : { createdAt: FieldValue.serverTimestamp() }),
         },
         { merge: true },
       );
+
+      batch.set(sourceRef, mapTrefleToSource(detail), { merge: true });
+
+      // Only derive a profile if nobody has hand-authored one, so curated care
+      // advice is never overwritten by the automatic rules.
+      const existingProfile = await profileRef.get();
+      if (!existingProfile.exists || existingProfile.data()?.isDerived === true) {
+        batch.set(
+          profileRef,
+          {
+            ...deriveCareProfile(detail, TREFLE_ATTRIBUTION.provider),
+            updatedAt: FieldValue.serverTimestamp(),
+            schemaVersion: SCHEMA_VERSION,
+          },
+          { merge: true },
+        );
+      }
+
+      await batch.commit();
+
+      logger.info("Cached species from catalog", {
+        speciesId: resolvedId,
+        trefleId: detail.id,
+        completeness: detail.completion_ratio,
+      });
+
+      return { speciesId: resolvedId, cached: false };
+    } catch (error) {
+      throw toHttpsError(error);
     }
-
-    await batch.commit();
-
-    logger.info("Cached species from catalog", {
-      speciesId: resolvedId,
-      trefleId: detail.id,
-      completeness: detail.completion_ratio,
-    });
-
-    return { speciesId: resolvedId, cached: false };
   },
 );

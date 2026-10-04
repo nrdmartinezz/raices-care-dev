@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../app/assets.dart';
+import '../../../../app/router.dart';
 import '../../../../app/theme.dart';
 import '../../data/home_providers.dart';
 import 'plant_card.dart';
@@ -50,7 +52,15 @@ class GrowingNowSection extends ConsumerWidget {
           AsyncValue(:final value?) => Column(
             children: [
               for (final plant in value) ...[
-                PlantCard(plant: plant),
+                PlantCard(
+                  plant: plant,
+                  // `go`, not `push`: the profile belongs to the My Plants
+                  // branch, so opening it moves to that tab.
+                  onTap: () => context.goNamed(
+                    PlantDetailRoute.name,
+                    pathParameters: {'plantId': plant.id},
+                  ),
+                ),
                 if (plant != value.last) const SizedBox(height: 12),
               ],
             ],

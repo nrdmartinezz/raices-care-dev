@@ -153,3 +153,17 @@ final speciesRepositoryProvider = Provider<SpeciesRepository>(
     functions: ref.watch(firebaseFunctionsProvider),
   ),
 );
+
+/// Watched, not fetched: `resolveSpecies` may still be filling the record in
+/// when a plant's profile first opens.
+final speciesProvider = StreamProvider.family<Species?, String>(
+  (ref, speciesId) =>
+      ref.watch(speciesRepositoryProvider).watchSpecies(speciesId),
+);
+
+/// Every schedule the catalog derived for a species. The profile shows the
+/// watering cadence from the first one.
+final careProfilesProvider = FutureProvider.family<List<CareProfile>, String>(
+  (ref, speciesId) =>
+      ref.watch(speciesRepositoryProvider).getCareProfiles(speciesId),
+);

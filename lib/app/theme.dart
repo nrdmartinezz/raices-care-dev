@@ -10,7 +10,14 @@ abstract final class AppColors {
   static const surfaceClay = Color(0xFFF1DFD8);
   static const track = Color(0xFFF7E4DE);
 
+  /// The hairline around cards and unselected choices.
+  static const border = Color(0xFFEAD8D1);
+
   static const mint = Color(0xFFBCEDDA);
+
+  /// The pale mint behind a plant tag. Lighter than [mint], which is for
+  /// filled indicators.
+  static const mintSoft = Color(0xFFE4F7EF);
   static const green = Color(0xFF3A6758);
   static const greenSoft = Color(0xFF406D5E);
 
@@ -70,9 +77,26 @@ abstract final class AppText {
     letterSpacing: 0.44,
   );
 
+  /// 11/15 regular. The quiet second line under a choice or a hint.
+  static TextStyle get caption => GoogleFonts.plusJakartaSans(
+    fontSize: 11,
+    height: 15 / 11,
+  );
+
   /// 12/18 regular. Task instructions and supporting copy.
   static TextStyle get body =>
       GoogleFonts.plusJakartaSans(fontSize: 12, height: 18 / 12);
+
+  /// 14/20 regular. The sentence under a section heading.
+  static TextStyle get bodyLarge =>
+      GoogleFonts.plusJakartaSans(fontSize: 14, height: 20 / 14);
+
+  /// 14/18 bold. Choice titles and card headings below [title].
+  static TextStyle get subtitleBold => GoogleFonts.plusJakartaSans(
+    fontSize: 14,
+    height: 18 / 14,
+    fontWeight: FontWeight.w700,
+  );
 
   /// 12/18 italic. Botanical names.
   static TextStyle get bodyItalic => GoogleFonts.plusJakartaSans(
@@ -101,6 +125,13 @@ abstract final class AppText {
   static TextStyle get metric => GoogleFonts.newsreader(
     fontSize: 22,
     height: 28 / 22,
+    fontWeight: FontWeight.w600,
+  );
+
+  /// Newsreader 20/22. Plant names on search results and summaries.
+  static TextStyle get plantTitle => GoogleFonts.newsreader(
+    fontSize: 20,
+    height: 22 / 20,
     fontWeight: FontWeight.w600,
   );
 

@@ -147,3 +147,14 @@ final dueRemindersProvider = StreamProvider<List<Reminder>>((ref) {
   }
   return ref.watch(reminderRepositoryProvider).watchDue();
 });
+
+/// Open reminders for one plant, soonest first, for its profile.
+final plantRemindersProvider = StreamProvider.family<List<Reminder>, String>((
+  ref,
+  plantId,
+) {
+  if (ref.watch(currentUserIdProvider) == null) {
+    return Stream.value(const []);
+  }
+  return ref.watch(reminderRepositoryProvider).watchForPlant(plantId);
+});

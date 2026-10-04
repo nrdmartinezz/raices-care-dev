@@ -7,6 +7,7 @@ import '../theme.dart';
 import 'account_sheet.dart';
 import 'app_bottom_nav.dart';
 import 'app_header.dart';
+import 'flow_header.dart';
 
 /// Frame shared by every tab: the frosted header above, the nav below, and
 /// the active branch between them.
@@ -31,9 +32,7 @@ class AppShell extends ConsumerWidget {
             top: 0,
             left: 0,
             right: 0,
-            child: AppHeader(
-              onProfile: () => showAccountSheet(context, ref),
-            ),
+            child: _header(context, ref),
           ),
           Positioned(
             bottom: 0,
@@ -53,6 +52,23 @@ class AppShell extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// The bar at the top of the frame.
+  ///
+  /// A tab root gets the logo bar. A screen pushed inside a branch keeps the
+  /// nav but needs a way back and a title instead, so it gets [FlowHeader].
+  Widget _header(BuildContext context, WidgetRef ref) {
+    if (GoRouterState.of(context).topRoute?.name == PlantDetailRoute.name) {
+      return FlowHeader(
+        eyebrow: 'MY PLANTS',
+        title: 'Plant profile',
+        onBack: () => context.canPop()
+            ? context.pop()
+            : context.goNamed(MyPlantsRoute.name),
+      );
+    }
+    return AppHeader(onProfile: () => showAccountSheet(context, ref));
   }
 }
 

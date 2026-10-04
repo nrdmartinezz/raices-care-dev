@@ -7,6 +7,8 @@ class HardinessZone {
     required this.postalCode,
     required this.zone,
     required this.temperatureRange,
+    this.latitude,
+    this.longitude,
   });
 
   final String postalCode;
@@ -17,6 +19,12 @@ class HardinessZone {
   /// Average annual extreme minimum, as published, such as `10 to 15`.
   /// Empty when the zone was restored from the profile rather than a lookup.
   final String temperatureRange;
+
+  /// Centroid published with the ZIP listing. Absent when the zone was
+  /// restored from the profile, or when the listing had no usable point.
+  /// The zone string is never derived from these.
+  final double? latitude;
+  final double? longitude;
 
   String? get temperatureLabel =>
       temperatureRange.isEmpty ? null : '$temperatureRange°F';

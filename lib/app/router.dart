@@ -11,6 +11,7 @@ import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/plants/presentation/add_plant_screen.dart';
 import '../features/plants/presentation/my_plants_screen.dart';
+import '../features/plants/presentation/plant_detail_screen.dart';
 import '../features/wisdom/presentation/wisdom_screen.dart';
 import 'shell/app_shell.dart';
 
@@ -37,6 +38,12 @@ abstract final class SignUpRoute {
 abstract final class MyPlantsRoute {
   static const name = 'myPlants';
   static const path = '/plants';
+}
+
+/// One plant, nested under the My Plants tab so the nav stays visible.
+abstract final class PlantDetailRoute {
+  static const name = 'plantDetail';
+  static const path = ':plantId';
 }
 
 abstract final class ChoresRoute {
@@ -145,6 +152,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: MyPlantsRoute.path,
                 name: MyPlantsRoute.name,
                 builder: (context, state) => const MyPlantsScreen(),
+                routes: [
+                  GoRoute(
+                    path: PlantDetailRoute.path,
+                    name: PlantDetailRoute.name,
+                    builder: (context, state) => PlantDetailScreen(
+                      plantId: state.pathParameters['plantId']!,
+                      // Set by the add-plant flow, so the profile can open
+                      // with its "added" banner and not show it again later.
+                      isNew: state.uri.queryParameters['new'] == '1',
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

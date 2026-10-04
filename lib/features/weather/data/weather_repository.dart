@@ -3,19 +3,17 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../domain/garden_weather.dart';
-import 'device_location.dart';
 
-/// Current conditions from api.weather.gov for this phone's location.
+/// Current conditions from api.weather.gov for a garden point.
 ///
-/// The service only covers the United States. A point outside that area comes
-/// back as 404, which is reported as [WeatherLookupException] rather than a
-/// crash. The UV index is not part of an observation, so it is not read.
+/// The point comes from the ZIP saved at onboarding. The service only covers
+/// the United States. A point outside that area comes back as 404, which is
+/// reported as [WeatherLookupException] rather than a crash. The UV index is
+/// not part of an observation, so it is not read.
 class WeatherRepository {
-  WeatherRepository({required this._client, DeviceLocation? location})
-    : _location = location ?? const DeviceLocation();
+  WeatherRepository({required this._client});
 
   final http.Client _client;
-  final DeviceLocation _location;
 
   static const _userAgent = 'Raices (care.raices.app)';
   static const _host = 'api.weather.gov';
@@ -30,13 +28,15 @@ class WeatherRepository {
     'The forecast could not be loaded.',
   );
 
-  Future<GardenWeather> current() async {
-    final point = await _location.current();
-    final latitude = point.latitude.toStringAsFixed(4);
-    final longitude = point.longitude.toStringAsFixed(4);
+  Future<GardenWeather> current({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final latitudeText = latitude.toStringAsFixed(4);
+    final longitudeText = longitude.toStringAsFixed(4);
 
     final forecastPoint = await _get(
-      Uri.parse('https://$_host/points/$latitude,$longitude'),
+      Uri.parse('https://$_host/points/$latitudeText,$longitudeText'),
       missingMeansOutside: true,
     );
     final properties = _map(forecastPoint['properties']);

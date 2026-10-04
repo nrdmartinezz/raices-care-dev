@@ -59,6 +59,7 @@ class PlantStat {
 /// A plant shown in the Growing Now carousel.
 class GrowingPlant {
   const GrowingPlant({
+    required this.id,
     required this.badge,
     required this.tone,
     required this.name,
@@ -68,6 +69,9 @@ class GrowingPlant {
     this.image,
     this.coverPhotoPath,
   });
+
+  /// The plant document's id, so tapping the card can open its profile.
+  final String id;
 
   /// Already-resolved artwork. Null renders the blush placeholder, which is
   /// also what a plant with no photo yet shows.
@@ -89,6 +93,7 @@ class GrowingPlant {
   final PlantStat condition;
 
   GrowingPlant withImage(ImageProvider? image) => GrowingPlant(
+    id: id,
     badge: badge,
     tone: tone,
     name: name,
