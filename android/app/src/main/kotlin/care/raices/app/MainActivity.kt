@@ -1,4 +1,4 @@
-package com.example.raices
+package care.raices.app
 
 import io.flutter.embedding.android.FlutterActivity
 
