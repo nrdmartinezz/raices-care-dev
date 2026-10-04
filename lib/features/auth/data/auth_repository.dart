@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/app_exception.dart';
@@ -57,7 +58,60 @@ class AuthRepository {
           email: user.email,
         ).toCreateJson(),
       );
+
+      // Nothing is gated on verification, so a failure here must not fail the
+      // sign-up: the account exists and the user is already signed in.
+      try {
+        await user.sendEmailVerification();
+      } on FirebaseAuthException {
+        // Usually a send-rate limit. Recoverable by resending later.
+      }
     });
+  }
+
+  /// Signs in with Google, registering the account on first use.
+  Future<void> signInWithGoogle() =>
+      _signInWithProvider(GoogleAuthProvider()..addScope('email'));
+
+  /// Signs in with Apple, registering the account on first use.
+  ///
+  /// Apple only releases the name on the very first authorization, so the
+  /// scope has to be requested even though we rarely get a second chance.
+  Future<void> signInWithApple() => _signInWithProvider(
+    AppleAuthProvider()
+      ..addScope('email')
+      ..addScope('name'),
+  );
+
+  /// Runs a federated sign-in and makes sure the profile document exists.
+  ///
+  /// With a social provider, signing up and signing in are the same call —
+  /// only the presence of /users/{uid} tells them apart — so every success
+  /// path has to check.
+  Future<void> _signInWithProvider(AuthProvider provider) {
+    return guardFirebase(() async {
+      if (kIsWeb) {
+        await _auth.signInWithPopup(provider);
+      } else {
+        await _auth.signInWithProvider(provider);
+      }
+      await ensureProfileExists();
+    });
+  }
+
+  /// Web only: whether the session outlives the browser tab.
+  ///
+  /// Mobile always persists the session and offers no equivalent, which is why
+  /// the "Remember me" checkbox has no effect there.
+  Future<void> setSessionPersistence({required bool remember}) async {
+    if (!kIsWeb) {
+      return;
+    }
+    await guardFirebase(
+      () => _auth.setPersistence(
+        remember ? Persistence.LOCAL : Persistence.SESSION,
+      ),
+    );
   }
 
   /// Creates the profile document if it is missing.
@@ -124,4 +178,23 @@ final userProfileProvider = StreamProvider<AppUser?>((ref) {
   // Re-subscribe when identity changes, so the stream never outlives a session.
   ref.watch(authStateProvider);
   return ref.watch(authRepositoryProvider).watchProfile();
+});
+
+/// Whether there is a session, with [unknown] for "we do not know yet".
+///
+/// [unknown] matters on a cold start: `authStateProvider` is briefly loading
+/// even for a signed-in user, and treating that as signed out flashes the
+/// sign-in screen at someone who is already logged in.
+enum AuthStatus { unknown, signedOut, signedIn }
+
+/// What the router gates on.
+///
+/// Deliberately a plain enum rather than `User?`, so a test can state the
+/// session it wants without constructing a Firebase `User`.
+final authStatusProvider = Provider<AuthStatus>((ref) {
+  final state = ref.watch(authStateProvider);
+  if (state.isLoading) {
+    return AuthStatus.unknown;
+  }
+  return state.value == null ? AuthStatus.signedOut : AuthStatus.signedIn;
 });

@@ -59,6 +59,44 @@ class RateLimitedException extends AppException {
   ]) : super(cause: cause, stackTrace: stackTrace);
 }
 
+/// The email is registered, but to a different sign-in method.
+///
+/// Firebase keeps one account per email address, so signing in with Google
+/// after registering with a password is refused rather than merged.
+class AccountExistsException extends AppException {
+  const AccountExistsException([
+    super.message =
+        'You already have an account with this email. '
+        'Sign in with the method you used before.',
+    Object? cause,
+    StackTrace? stackTrace,
+  ]) : super(cause: cause, stackTrace: stackTrace);
+}
+
+/// The sign-in method is not enabled on the Firebase project.
+///
+/// Expected until Google and Apple are configured in the console. Separate
+/// from a real failure so the UI can say so plainly instead of blaming the
+/// user's credentials.
+class SignInUnavailableException extends AppException {
+  const SignInUnavailableException([
+    super.message = 'That sign-in method is not set up yet.',
+    Object? cause,
+    StackTrace? stackTrace,
+  ]) : super(cause: cause, stackTrace: stackTrace);
+}
+
+/// The user backed out of a social sign-in sheet.
+///
+/// Not an error to show: callers are expected to swallow it.
+class SignInCancelledException extends AppException {
+  const SignInCancelledException([
+    super.message = 'Sign-in cancelled.',
+    Object? cause,
+    StackTrace? stackTrace,
+  ]) : super(cause: cause, stackTrace: stackTrace);
+}
+
 /// The data did not match what the model expected.
 class MalformedDataException extends AppException {
   const MalformedDataException(
@@ -89,6 +127,14 @@ AppException mapFirebaseException(Object error, StackTrace stackTrace) {
       'email-already-in-use' => const PermissionDeniedException(
         'That email is already registered.',
       ),
+      'account-exists-with-different-credential' ||
+      'credential-already-in-use' => const AccountExistsException(),
+      'operation-not-allowed' ||
+      'configuration-not-found' => const SignInUnavailableException(),
+      'popup-closed-by-user' ||
+      'cancelled-popup-request' ||
+      'web-context-canceled' ||
+      'user-cancelled' => const SignInCancelledException(),
       'network-request-failed' => const NetworkException(),
       'too-many-requests' => const RateLimitedException(),
       _ => UnauthenticatedException(

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../router.dart';
 import '../theme.dart';
+import 'account_sheet.dart';
 import 'app_bottom_nav.dart';
 import 'app_header.dart';
 
@@ -13,19 +15,26 @@ import 'app_header.dart';
 /// is what gives the design its frosted-glass edges. Content therefore has to
 /// pad itself clear of both — use [ShellScrollView] rather than doing it by
 /// hand.
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.canvas,
       body: Stack(
         children: [
           Positioned.fill(child: navigationShell),
-          const Positioned(top: 0, left: 0, right: 0, child: AppHeader()),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: AppHeader(
+              onProfile: () => showAccountSheet(context, ref),
+            ),
+          ),
           Positioned(
             bottom: 0,
             left: 0,

@@ -62,6 +62,14 @@ class UserSettingsRepository {
     );
   }
 
+  /// Drops this device's token, for sign-out.
+  Future<void> removeCurrentDeviceToken() async {
+    final token = await _messaging.getToken();
+    if (token != null) {
+      await removeDeviceToken(token);
+    }
+  }
+
   /// Drops a token. Do this on sign-out, or the next person to use the device
   /// receives the previous user's reminders.
   Future<void> removeDeviceToken(String token) {

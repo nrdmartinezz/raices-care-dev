@@ -27,6 +27,15 @@ abstract final class AppIcons {
   static const navAdd = 'assets/icons/nav_add.svg';
   static const navChores = 'assets/icons/nav_chores.svg';
   static const navWisdom = 'assets/icons/nav_wisdom.svg';
+
+  static const authBadge = 'assets/icons/auth_badge.svg';
+  static const fieldEmail = 'assets/icons/field_email.svg';
+  static const fieldPassword = 'assets/icons/field_password.svg';
+  static const fieldEye = 'assets/icons/field_eye.svg';
+  static const ctaArrow = 'assets/icons/cta_arrow.svg';
+  static const socialApple = 'assets/icons/social_apple.svg';
+  static const socialGoogle = 'assets/icons/social_google.svg';
+  static const footerLeaf = 'assets/icons/footer_leaf.svg';
 }
 
 abstract final class AppImages {
@@ -36,4 +45,11 @@ abstract final class AppImages {
   static const plantMonstera = 'assets/images/plant_monstera.png';
   static const plantHabanero = 'assets/images/plant_habanero.png';
   static const plantRosemary = 'assets/images/plant_rosemary.png';
+
+  /// The white logo is exported as four separate vector groups rather than one
+  /// file. `AuthLogo` lays them out; nothing else should reference them.
+  static const logoWhiteCrown = 'assets/images/logo_white_crown.svg';
+  static const logoWhiteRoots = 'assets/images/logo_white_roots.svg';
+  static const logoWhiteWordLeft = 'assets/images/logo_white_word_left.svg';
+  static const logoWhiteWordRight = 'assets/images/logo_white_word_right.svg';
 }

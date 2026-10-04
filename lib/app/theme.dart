@@ -24,6 +24,17 @@ abstract final class AppColors {
   static const amber = Color(0xFFFFDEAD);
   static const amberText = Color(0xFF7B5500);
   static const amberInk = Color(0xFF281900);
+
+  /// The auth canopy gradient, top to bottom.
+  static const canopyDeep = Color(0xFF214F41);
+  static const canopySage = Color(0xFF6C9A8A);
+
+  /// The selected language in the canopy pill. Legible on the deep green,
+  /// where [terracotta] would not be.
+  static const accentAmber = Color(0xFFFABC4D);
+
+  /// The version line under the dedication: present, but barely.
+  static const footerFaint = Color(0xFFDEC0B7);
 }
 
 /// Text styles from the design. Colour is applied at the call site so a single
@@ -107,6 +118,42 @@ abstract final class AppText {
     fontWeight: FontWeight.w500,
     fontStyle: FontStyle.italic,
   );
+
+  /// Newsreader 18/24. Sheet card headings. Looser than [plantName], which is
+  /// the same size set tighter for a two-line stack.
+  static TextStyle get cardTitle => GoogleFonts.newsreader(
+    fontSize: 18,
+    height: 24 / 18,
+    fontWeight: FontWeight.w500,
+  );
+
+  /// 13/16 semibold. Form field labels.
+  static TextStyle get fieldLabel => GoogleFonts.plusJakartaSans(
+    fontSize: 13,
+    height: 16 / 13,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.26,
+  );
+
+  /// 14 regular. Text typed into a field. Line height is left to the field so
+  /// the cursor sits where the platform expects.
+  static TextStyle get input => GoogleFonts.plusJakartaSans(fontSize: 14);
+
+  /// 11/14 bold, very wide. The rule-flanked "OR CONTINUE WITH".
+  static TextStyle get dividerLabel => GoogleFonts.plusJakartaSans(
+    fontSize: 11,
+    height: 14 / 11,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 1.1,
+  );
+
+  /// 16/22 semibold. Inline links sized to sit beside [title].
+  static TextStyle get titleSemiBold => GoogleFonts.plusJakartaSans(
+    fontSize: 16,
+    height: 22 / 16,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.08,
+  );
 }
 
 abstract final class AppShadows {
@@ -149,6 +196,36 @@ abstract final class AppShadows {
       color: const Color(0xFF2C221E).withValues(alpha: 0.08),
       offset: const Offset(0, -4),
       blurRadius: 24,
+      spreadRadius: -4,
+    ),
+  ];
+
+  /// The auth card floating over the canopy.
+  static List<BoxShadow> get sheet => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.1),
+      offset: const Offset(0, 20),
+      blurRadius: 12.5,
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.1),
+      offset: const Offset(0, 8),
+      blurRadius: 5,
+    ),
+  ];
+
+  /// The lift under a primary call to action.
+  static List<BoxShadow> get cta => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.1),
+      offset: const Offset(0, 10),
+      blurRadius: 15,
+      spreadRadius: -3,
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.1),
+      offset: const Offset(0, 4),
+      blurRadius: 6,
       spreadRadius: -4,
     ),
   ];

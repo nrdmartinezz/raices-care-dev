@@ -8,8 +8,12 @@ import 'package:raices/features/plants/data/plant_repository.dart';
 
 /// The app with every Firebase-backed provider stubbed out, so the shell can
 /// be pumped without an initialized Firebase app.
+///
+/// `authStatusProvider` has to be stated too, or the router's redirect holds
+/// the app on the splash screen waiting for a session that never resolves.
 Widget _appWithEmptyGarden() => ProviderScope(
   overrides: [
+    authStatusProvider.overrideWithValue(AuthStatus.signedIn),
     nowProvider.overrideWithValue(DateTime(2026, 10, 3, 9)),
     userProfileProvider.overrideWith((ref) => Stream.value(null)),
     activePlantsProvider.overrideWith((ref) => Stream.value(const [])),
