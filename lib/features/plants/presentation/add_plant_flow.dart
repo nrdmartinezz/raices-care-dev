@@ -1480,7 +1480,7 @@ class _PhotoWell extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: DottedBorderBox(
+      child: _DottedBorderBox(
         child: Row(
           children: [
             Container(
@@ -1534,8 +1534,8 @@ class _PhotoWell extends StatelessWidget {
 }
 
 /// The dashed well around the photo picker.
-class DottedBorderBox extends StatelessWidget {
-  const DottedBorderBox({super.key, required this.child});
+class _DottedBorderBox extends StatelessWidget {
+  const _DottedBorderBox({required this.child});
 
   final Widget child;
 
