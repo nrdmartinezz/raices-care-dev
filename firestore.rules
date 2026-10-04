@@ -1,0 +1,232 @@
+rules_version = '2';
+
+// Raíces Firestore security rules.
+//
+// Two trust zones:
+//
+//   1. The shared catalog (species, plantCategories, careTaskTemplates,
+//      pestDiseaseCatalog) is readable by anyone so the species browser works
+//      before sign-in, and is never writable from a client. Editorial imports
+//      and curation MUST run through the Admin SDK in Cloud Functions or
+//      another trusted server environment.
+//
+//   2. Everything under /users/{uid} belongs to that one signed-in user.
+//
+// The Admin SDK bypasses these rules, so the scheduled reminder pipeline and
+// the care-event recalculation triggers can write server-owned fields that the
+// client-facing rules below deliberately refuse.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------- helpers
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Editorial and entitlement fields the Admin SDK alone may write.
+    function noPrivilegedFields(data) {
+      return !data.keys().hasAny([
+        'roles',
+        'isAdmin',
+        'entitlements',
+        'moderation',
+        'curationStatus',
+        'verifiedByEditor'
+      ]);
+    }
+
+    function hasSchemaVersion(data) {
+      return data.schemaVersion is int && data.schemaVersion >= 1;
+    }
+
+    // True when an update leaves the field alone, either by omitting it or by
+    // sending back the stored value.
+    function unchanged(key) {
+      return !(key in request.resource.data)
+          || request.resource.data[key] == resource.data[key];
+    }
+
+    function isFilledString(value, maxLength) {
+      return value is string && value.size() > 0 && value.size() <= maxLength;
+    }
+
+    // --------------------------------------------------------- shared catalog
+
+    match /species/{speciesId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /careProfiles/{profileId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      match /cultivars/{cultivarId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      match /sources/{sourceId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    match /plantCategories/{categoryId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /careTaskTemplates/{templateId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /pestDiseaseCatalog/{issueId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------ user-owned
+
+    match /users/{userId} {
+      allow get, list: if isOwner(userId);
+      allow delete: if isOwner(userId);
+
+      allow create: if isOwner(userId)
+                    && hasSchemaVersion(incoming())
+                    && noPrivilegedFields(incoming());
+
+      allow update: if isOwner(userId)
+                    && hasSchemaVersion(incoming())
+                    && noPrivilegedFields(incoming())
+                    && unchanged('createdAt');
+
+      // Private per-user settings. `private` is the only document id in use;
+      // pinning it keeps the subcollection from becoming a dumping ground.
+      match /settings/private {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /gardens/{gardenId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+                              && isFilledString(incoming().displayName, 120)
+                              && noPrivilegedFields(incoming());
+      }
+
+      match /plants/{plantId} {
+        function validPlant() {
+          let data = request.resource.data;
+          return isFilledString(data.speciesId, 1500)
+              && isFilledString(data.displayName, 120)
+              && data.locationType in ['indoor', 'outdoor', 'greenhouse', 'other']
+              && data.growingMethod in ['container', 'in_ground', 'raised_bed', 'hydroponic', 'other']
+              && data.plantAgeStage in ['seed', 'seedling', 'young_establishing', 'mature', 'unknown']
+              && noPrivilegedFields(data);
+        }
+
+        allow read, delete: if isOwner(userId);
+        allow create: if isOwner(userId) && validPlant() && hasSchemaVersion(incoming());
+        allow update: if isOwner(userId) && validPlant() && unchanged('createdAt');
+
+        // Care history is append-oriented: a client records an event or removes
+        // one it entered by mistake, but cannot rewrite history. Trusted
+        // recalculation happens in onCareEventCreated via the Admin SDK.
+        match /careEvents/{eventId} {
+          allow read, delete: if isOwner(userId);
+          allow create: if isOwner(userId)
+                        && incoming().eventType in [
+                             'watered', 'fertilized', 'pruned', 'repotted',
+                             'transplanted', 'harvested', 'deadheaded', 'mulched',
+                             'pest_inspection', 'pest_treatment', 'disease_observation',
+                             'weather_damage', 'photo_added', 'health_check',
+                             'planted', 'acquired', 'archived'
+                           ]
+                        && incoming().occurredAt is timestamp
+                        // Only Cloud Functions may record system-performed care.
+                        && incoming().performedBy == 'user'
+                        && hasSchemaVersion(incoming());
+          allow update: if false;
+        }
+
+        // Metadata only. The binary lives in Storage, and the recorded path
+        // must sit inside this user's own folder for this plant.
+        match /photos/{photoId} {
+          allow read, delete: if isOwner(userId);
+          allow create, update: if isOwner(userId)
+                                && isFilledString(incoming().storagePath, 1500)
+                                && incoming().storagePath
+                                     .matches('users/' + userId + '/plants/' + plantId + '/.*')
+                                && noPrivilegedFields(incoming());
+        }
+
+        match /observations/{observationId} {
+          allow read, delete: if isOwner(userId);
+          allow create, update: if isOwner(userId)
+                                && isFilledString(incoming().note, 5000)
+                                && noPrivilegedFields(incoming());
+        }
+      }
+
+      match /reminders/{reminderId} {
+        function validStatus(value) {
+          return value in [
+            'open', 'completed', 'skipped', 'snoozed', 'expired', 'cancelled'
+          ];
+        }
+
+        allow read, delete: if isOwner(userId);
+
+        // A client may only add its own manual reminders. Reminders derived
+        // from a care profile are written by onPlantCreated through the
+        // Admin SDK, which is why schedule.source must be 'user' here.
+        allow create: if isOwner(userId)
+                      && isFilledString(incoming().plantId, 1500)
+                      && isFilledString(incoming().title, 200)
+                      && incoming().taskType in [
+                           'water_check', 'fertilize', 'prune', 'repot',
+                           'pest_check', 'harvest', 'seasonal_task', 'custom'
+                         ]
+                      && validStatus(incoming().status)
+                      && incoming().dueAt is timestamp
+                      && incoming().schedule.source == 'user'
+                      && hasSchemaVersion(incoming());
+
+        // Completing, skipping or snoozing is a client action; re-pointing a
+        // reminder at a different plant is not.
+        allow update: if isOwner(userId)
+                      && validStatus(incoming().status)
+                      && unchanged('plantId')
+                      && unchanged('createdAt');
+      }
+    }
+
+    // ---------------------------------------------------- planned, not yet live
+    // Community surfaces are locked until their shape is reviewed, so nothing
+    // can be written against a schema we have not designed.
+
+    match /publicProfiles/{userId} {
+      allow read, write: if false;
+    }
+
+    match /communityPosts/{postId} {
+      allow read, write: if false;
+    }
+
+    // Anything not matched above stays closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
