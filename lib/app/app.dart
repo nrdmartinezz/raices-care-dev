@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../features/home/presentation/home_screen.dart';
+import 'router.dart';
 import 'theme.dart';
 
-class RaicesApp extends StatelessWidget {
+class RaicesApp extends ConsumerWidget {
   const RaicesApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    return MaterialApp.router(
       title: 'Raíces',
       debugShowCheckedModeBanner: false,
       theme: buildRaicesTheme(),
-      home: const HomeScreen(),
+      routerConfig: ref.watch(routerProvider),
     );
   }
 }

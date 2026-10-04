@@ -59,3 +59,21 @@ lib/firebase_options.dart
 .env.*
 *firebase-adminsdk*.json
 serviceAccount*.json
+
+# Cloud Functions
+functions/node_modules/
+functions/lib/
+functions/.env
+functions/.env.*
+
+# Firebase tooling local state
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+.runtimeconfig.json
+
+# Emulator exports, which can contain real user data if exported from prod
+emulator-data/
