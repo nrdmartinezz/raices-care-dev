@@ -1,0 +1,26 @@
+{
+  "name": "raices-functions",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Trusted backend for Raíces: user bootstrap, reminder generation and catalog ingestion.",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions,firestore,auth,storage",
+    "seed": "npm run build && node lib/scripts/seed_catalog.js",
+    "shell": "npm run build && firebase functions:shell",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^6.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,1 +1,54 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"raices-care","appId":"1:392022672087:android:b91436da3e2adf118da692","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"raices-care","configurations":{"android":"1:392022672087:android:b91436da3e2adf118da692","ios":"1:392022672087:ios:35466196871cd54e8da692","macos":"1:392022672087:ios:35466196871cd54e8da692","web":"1:392022672087:web:0779eb3f36e920098da692","windows":"1:392022672087:web:e6d97f9b58ffc0ba8da692"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
+    }
+  ],
+  "emulators": {
+    "auth": { "port": 9099 },
+    "firestore": { "port": 8080 },
+    "storage": { "port": 9199 },
+    "functions": { "port": 5001 },
+    "ui": { "enabled": true, "port": 4000 },
+    "singleProjectMode": true
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "raices-care",
+          "appId": "1:392022672087:android:b91436da3e2adf118da692",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "raices-care",
+          "configurations": {
+            "android": "1:392022672087:android:b91436da3e2adf118da692",
+            "ios": "1:392022672087:ios:35466196871cd54e8da692",
+            "macos": "1:392022672087:ios:35466196871cd54e8da692",
+            "web": "1:392022672087:web:0779eb3f36e920098da692",
+            "windows": "1:392022672087:web:e6d97f9b58ffc0ba8da692"
+          }
+        }
+      }
+    }
+  }
+}
