@@ -6,6 +6,8 @@ log care actions, upload photos, record observations, and browse a shared specie
 
 Firebase project: `raices-care`
 
+Picking the work back up? Start with [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md).
+
 ## App identifiers
 
 The Android `applicationId`, iOS bundle ID, and macOS bundle ID are all `care.raices.app`,
@@ -139,10 +141,12 @@ a committed file, or a log line.
 ```
 lib/
   app/           theme, router, root widget
+    shell/       header, bottom nav, and the frame the tabs render into
   core/
     errors/      AppException hierarchy and the Firebase error mapper
     firebase/    initialization, emulator wiring, Riverpod providers
     utils/       lenient Firestore field readers
+    widgets/     shared presentation pieces
   features/
     <feature>/
       domain/    immutable models with fromFirestore / toCreateJson
@@ -163,6 +167,18 @@ generated from a species care profile, are written by Cloud Functions, not by th
 record what happened — "I watered this" — and the triggers work out what follows. The Firestore
 rules enforce this: those fields are rejected on a client write. So log a care event rather
 than editing a plant's timestamps, and the reminder rolls forward on its own.
+
+### Navigation
+
+The four tabs — Home, My Plants, Chores, Wisdom — are branches of a go_router
+`StatefulShellRoute`, so each keeps its own stack and scroll position as you move between
+them. `AppShell` draws the frosted header and bottom nav over the active branch, which means
+screen content has to pad itself clear of both: wrap it in `ShellScrollView` rather than doing
+that by hand. The central add button is routed *outside* the shell, so it covers the nav and
+reads as a task you finish or abandon.
+
+Only Home is built. The other three render `PlaceholderView`, which also lists what each
+screen is meant to do.
 
 ## Firebase backend
 

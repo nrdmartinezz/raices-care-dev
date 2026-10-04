@@ -1,12 +1,12 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/firebase/firebase_providers.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../care/data/reminder_repository.dart';
 import '../../care/domain/reminder.dart';
 import '../../photos/data/photo_repository.dart';
 import '../../plants/data/plant_repository.dart';
-import '../../plants/domain/plant.dart';
 import '../domain/care_task.dart';
 import '../domain/growing_plant.dart';
 import 'home_mappers.dart';
@@ -30,7 +30,7 @@ final todaysRemindersProvider = StreamProvider<List<Reminder>>((ref) {
 /// The date line and greeting above the weather strip.
 final greetingProvider = Provider<({String date, String greeting})>((ref) {
   final now = ref.watch(nowProvider);
-  final profile = ref.watch(userProfileProvider).valueOrNull;
+  final profile = ref.watch(userProfileProvider).value;
   return (
     date: formatDateLabel(now),
     greeting: greetingFor(now, profile?.displayName),
@@ -39,7 +39,7 @@ final greetingProvider = Provider<({String date, String greeting})>((ref) {
 
 /// Label for the mint pill: the next thing due, or an all-clear.
 final ritualPillProvider = Provider<String>((ref) {
-  final reminders = ref.watch(todaysRemindersProvider).valueOrNull;
+  final reminders = ref.watch(todaysRemindersProvider).value;
   final now = ref.watch(nowProvider);
   final upcoming = reminders?.where((r) => r.dueAt.isAfter(now));
   return ritualPillLabel(
@@ -62,9 +62,10 @@ class RitualSummary {
 
   double get progress => totalCount == 0 ? 0 : doneCount / totalCount;
 
-  String get progressLabel => totalCount == 0
-      ? 'Nothing scheduled'
-      : '$doneCount of $totalCount tasks done';
+  /// Null when there is nothing to count, so the heading stays bare and the
+  /// empty-state card carries the message on its own.
+  String? get progressLabel =>
+      totalCount == 0 ? null : '$doneCount of $totalCount tasks done';
 }
 
 /// Today's Ritual: the open tasks, plus how many are already behind them.
@@ -77,18 +78,19 @@ final ritualSummaryProvider = Provider<AsyncValue<RitualSummary>>((ref) {
   final plantsAsync = ref.watch(activePlantsProvider);
   final now = ref.watch(nowProvider);
 
-  final reminders = remindersAsync.valueOrNull;
-  final plants = plantsAsync.valueOrNull;
+  // Either stream failing fails the section; neither is optional here.
+  final error = remindersAsync.error ?? plantsAsync.error;
+  if (error != null) {
+    return AsyncValue.error(
+      error,
+      remindersAsync.stackTrace ?? plantsAsync.stackTrace ?? StackTrace.empty,
+    );
+  }
 
+  final reminders = remindersAsync.value;
+  final plants = plantsAsync.value;
   if (reminders == null || plants == null) {
-    // Surface whichever stream is still loading or has failed.
-    return remindersAsync.isLoading || plantsAsync.isLoading
-        ? const AsyncValue.loading()
-        : (remindersAsync.hasError ? remindersAsync : plantsAsync).map(
-            data: (_) => const AsyncValue.loading(),
-            error: (e) => AsyncValue.error(e.error, e.stackTrace),
-            loading: (_) => const AsyncValue.loading(),
-          );
+    return const AsyncValue.loading();
   }
 
   final byId = {for (final plant in plants) plant.id: plant};
@@ -121,7 +123,7 @@ final growingNowProvider = Provider<AsyncValue<List<GrowingPlant>>>((ref) {
 
 /// Total active plants, for the "View all N" link.
 final activePlantCountProvider = Provider<int>(
-  (ref) => ref.watch(activePlantsProvider).valueOrNull?.length ?? 0,
+  (ref) => ref.watch(activePlantsProvider).value?.length ?? 0,
 );
 
 /// Resolves a cover photo's Storage path to an image.
@@ -140,7 +142,5 @@ final plantCoverImageProvider = FutureProvider.family<ImageProvider?, String>((
 /// Convenience view of whether the garden is empty, used to pick between the
 /// plant list and the first-plant prompt.
 final hasPlantsProvider = Provider<bool>(
-  (ref) => (ref.watch(activePlantsProvider).valueOrNull ?? const []).isNotEmpty,
+  (ref) => (ref.watch(activePlantsProvider).value ?? const []).isNotEmpty,
 );
-
-typedef PlantsAsync = AsyncValue<List<Plant>>;

@@ -1,9 +1,12 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../app/assets.dart';
 import '../../../../app/theme.dart';
+import '../../data/home_providers.dart';
 import '../../domain/growing_plant.dart';
 
 /// A Growing Now card: cropped photo with a status badge, the common and
@@ -55,13 +58,22 @@ class PlantCard extends StatelessWidget {
   }
 }
 
-class _Photo extends StatelessWidget {
+class _Photo extends ConsumerWidget {
   const _Photo({required this.plant});
 
   final GrowingPlant plant;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // A supplied image wins; otherwise resolve the Storage path, which yields
+    // a URL that expires and so cannot be stored on the plant.
+    final path = plant.coverPhotoPath;
+    final image =
+        plant.image ??
+        (path == null
+            ? null
+            : ref.watch(plantCoverImageProvider(path)).value);
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppSizes.imageRadius),
       child: Container(
@@ -71,7 +83,9 @@ class _Photo extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset(plant.image, fit: BoxFit.cover),
+              child: image == null
+                  ? const _PhotoPlaceholder()
+                  : Image(image: image, fit: BoxFit.cover),
             ),
             Positioned(
               left: 8,
@@ -80,6 +94,21 @@ class _Photo extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Shown for a plant with no photo, and while a cover URL is resolving.
+class _PhotoPlaceholder extends StatelessWidget {
+  const _PhotoPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Opacity(
+        opacity: 0.35,
+        child: SvgPicture.asset(AppIcons.growingSprout, width: 28, height: 28),
       ),
     );
   }
