@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../app/assets.dart';
 import '../../../../app/theme.dart';
+import '../../data/home_providers.dart';
 import '../../data/home_template_content.dart';
 
 /// Section 1: the date, greeting and next-ritual pill, above the weather strip.
-class GreetingSection extends StatelessWidget {
+class GreetingSection extends ConsumerWidget {
   const GreetingSection({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final heading = ref.watch(greetingProvider);
+
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Column(
@@ -26,12 +30,12 @@ class GreetingSection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        HomeTemplateContent.dateLabel,
+                        heading.date,
                         style: AppText.eyebrow.copyWith(color: AppColors.green),
                       ),
                       const SizedBox(height: 2.5),
                       Text(
-                        HomeTemplateContent.greeting,
+                        heading.greeting,
                         style: AppText.display.copyWith(color: AppColors.ink),
                       ),
                     ],
@@ -49,11 +53,11 @@ class GreetingSection extends StatelessWidget {
   }
 }
 
-class _RitualPill extends StatelessWidget {
+class _RitualPill extends ConsumerWidget {
   const _RitualPill();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -71,7 +75,7 @@ class _RitualPill extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            HomeTemplateContent.ritualPillLabel,
+            ref.watch(ritualPillProvider),
             style: AppText.label.copyWith(color: AppColors.greenSoft),
           ),
         ],
