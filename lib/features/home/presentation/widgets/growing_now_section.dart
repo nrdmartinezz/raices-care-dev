@@ -39,16 +39,11 @@ class GrowingNowSection extends ConsumerWidget {
                 ),
         ),
         const SizedBox(height: 8),
-        // A value is shown whenever there is one, even while the stream is
-        // re-subscribing: a refresh carries the previous data along with
-        // `AsyncLoading`, and dropping back to the skeleton makes the cards
-        // flicker away for no reason the gardener can see.
+        // A non-empty list stays on screen across a reload. An error that has
+        // nothing to show is a failed read, including one that still holds
+        // `[]` — that must not be announced as an empty garden.
         switch (plants) {
-          AsyncValue(:final value?) when value.isEmpty => const SectionMessage(
-            title: 'No plants yet',
-            body: 'Tap the add button to plant your first one.',
-          ),
-          AsyncValue(:final value?) => Column(
+          AsyncValue(:final value?) when value.isNotEmpty => Column(
             children: [
               for (final plant in value) ...[
                 PlantCard(
@@ -64,9 +59,13 @@ class GrowingNowSection extends ConsumerWidget {
               ],
             ],
           ),
-          AsyncError(:final error) => SectionMessage(
+          AsyncValue(hasError: true, :final error?) => SectionMessage(
             title: 'Your plants could not load',
             body: describeSectionError(error),
+          ),
+          AsyncValue(:final value?) => const SectionMessage(
+            title: 'No plants yet',
+            body: 'Tap the add button to plant your first one.',
           ),
           _ => const SectionSkeleton(rows: 2, height: 220),
         },

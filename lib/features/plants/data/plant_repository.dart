@@ -6,6 +6,19 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../domain/plant.dart';
 
+/// Drops archived plants and sorts by display name.
+///
+/// Same order as Firestore `orderBy('displayName')`: Dart [String.compareTo]
+/// and Firestore both compare UTF-16 code units.
+List<Plant> activePlantsIn(Iterable<Plant> plants) {
+  final active = [
+    for (final plant in plants)
+      if (!plant.status.isArchived) plant,
+  ];
+  active.sort((a, b) => a.displayName.compareTo(b.displayName));
+  return active;
+}
+
 /// The plants one user owns.
 class PlantRepository {
   PlantRepository({required this._firestore, required this._userId});
@@ -15,23 +28,29 @@ class PlantRepository {
 
   static const _uuid = Uuid();
 
-  /// Active plants, alphabetically. Backed by the
-  /// `status.isArchived, displayName` composite index.
+  /// Active plants, alphabetically.
+  ///
+  /// The plants subcollection is listened to as a whole and filtered here.
+  /// `where('status.isArchived')` plus `orderBy('displayName')` needs a
+  /// composite index; until that index exists the snapshot errors, and both
+  /// My Plants and Growing Now stay blank. One person's garden is small
+  /// enough to drop archived plants and sort in memory, and a plain
+  /// collection listen does not need that index.
   Stream<List<Plant>> watchActivePlants() {
-    return _plants
-        .where('status.isArchived', isEqualTo: false)
-        .orderBy('displayName')
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map(Plant.fromFirestore).toList());
+    return _plants.snapshots().map(
+      (snapshot) => activePlantsIn(snapshot.docs.map(Plant.fromFirestore)),
+    );
   }
 
   Stream<List<Plant>> watchPlantsInGarden(String gardenId) {
-    return _plants
-        .where('gardenId', isEqualTo: gardenId)
-        .where('status.isArchived', isEqualTo: false)
-        .orderBy('displayName')
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map(Plant.fromFirestore).toList());
+    return _plants.snapshots().map(
+      (snapshot) => [
+        for (final plant in activePlantsIn(
+          snapshot.docs.map(Plant.fromFirestore),
+        ))
+          if (plant.gardenId == gardenId) plant,
+      ],
+    );
   }
 
   Stream<Plant?> watchPlant(String plantId) {
