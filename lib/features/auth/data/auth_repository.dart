@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
+import '../../../core/utils/firestore_values.dart';
 import '../domain/app_user.dart';
 
 /// Identity, plus the profile document that mirrors it.
@@ -152,12 +153,56 @@ class AuthRepository {
 
   Future<void> updateProfile(AppUser user) {
     return guardFirebase(
-      () => _profileRef(user.id).set(user.toUpdateJson(), SetOptions(merge: true)),
+      () =>
+          _profileRef(user.id)
+              .set(user.toUpdateJson(), SetOptions(merge: true)),
     );
   }
 
+  /// Keeps the auth account's name in step with the profile document.
+  Future<void> updateAuthDisplayName(String displayName) {
+    return guardFirebase(() async {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw const UnauthenticatedException();
+      }
+      await user.updateDisplayName(displayName);
+    });
+  }
+
+  /// Marks onboarding finished.
+  ///
+  /// The plant step can be skipped. A confirmed hardiness zone cannot: the
+  /// garden has nothing to schedule against without one.
+  Future<void> completeOnboarding() {
+    return guardFirebase(() async {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw const UnauthenticatedException();
+      }
+
+      final snapshot = await _profileRef(user.uid).get();
+      final zone = HomeLocation.fromMap(
+        FirestoreValue.map(snapshot.data()?['homeLocation']),
+      ).hardinessZone;
+      if (zone == null) {
+        throw const MalformedDataException(
+          'Confirm a hardiness zone before finishing.',
+        );
+      }
+
+      await _profileRef(user.uid).set({
+        'onboardingCompletedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'schemaVersion': kSchemaVersion,
+      }, SetOptions(merge: true));
+    });
+  }
+
   Future<void> sendPasswordReset(String email) {
-    return guardFirebase(() => _auth.sendPasswordResetEmail(email: email.trim()));
+    return guardFirebase(
+      () => _auth.sendPasswordResetEmail(email: email.trim()),
+    );
   }
 
   Future<void> signOut() => guardFirebase(() => _auth.signOut());
@@ -197,4 +242,27 @@ final authStatusProvider = Provider<AuthStatus>((ref) {
     return AuthStatus.unknown;
   }
   return state.value == null ? AuthStatus.signedOut : AuthStatus.signedIn;
+});
+
+/// Whether a signed-in gardener still has to walk through onboarding.
+///
+/// [pending] holds the splash until the profile stream resolves, the same way
+/// an unknown session does. Signed-out sessions report [finished] so this
+/// provider never subscribes to the profile — the router applies the auth
+/// redirect on its own and must not touch Firebase while signed out.
+enum OnboardingGate { pending, required, finished }
+
+final onboardingGateProvider = Provider<OnboardingGate>((ref) {
+  if (ref.watch(authStatusProvider) != AuthStatus.signedIn) {
+    return OnboardingGate.finished;
+  }
+
+  final profile = ref.watch(userProfileProvider);
+  if (profile.isLoading || profile.hasError) {
+    return OnboardingGate.pending;
+  }
+  if (profile.value?.onboardingCompletedAt == null) {
+    return OnboardingGate.required;
+  }
+  return OnboardingGate.finished;
 });

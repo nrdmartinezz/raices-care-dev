@@ -44,7 +44,8 @@ class NotFoundException extends AppException {
 
 class NetworkException extends AppException {
   const NetworkException([
-    super.message = 'No connection. Changes will sync when you are back online.',
+    super.message =
+        'No connection. Changes will sync when you are back online.',
     Object? cause,
     StackTrace? stackTrace,
   ]) : super(cause: cause, stackTrace: stackTrace);
@@ -99,11 +100,7 @@ class SignInCancelledException extends AppException {
 
 /// The data did not match what the model expected.
 class MalformedDataException extends AppException {
-  const MalformedDataException(
-    super.message, {
-    super.cause,
-    super.stackTrace,
-  });
+  const MalformedDataException(super.message, {super.cause, super.stackTrace});
 }
 
 class UnexpectedException extends AppException {
@@ -112,6 +109,13 @@ class UnexpectedException extends AppException {
     Object? cause,
     StackTrace? stackTrace,
   ]) : super(cause: cause, stackTrace: stackTrace);
+}
+
+/// The 2023 ZIP hardiness listing could not answer.
+///
+/// The gardener stays on the ZIP step. A zone is never invented instead.
+class ZoneLookupException extends AppException {
+  const ZoneLookupException(super.message, {super.cause, super.stackTrace});
 }
 
 /// Normalizes anything thrown by a Firebase SDK into an [AppException].

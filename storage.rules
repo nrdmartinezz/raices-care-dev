@@ -3,6 +3,7 @@ rules_version = '2';
 // Raíces Storage security rules.
 //
 // Layout:
+//   users/{uid}/profile/avatar.jpg               profile photo, private
 //   users/{uid}/plants/{plantId}/{photoId}.jpg   user uploads, private
 //   species/{speciesId}/{imageId}.jpg            editorial media, read-only
 //
@@ -29,6 +30,15 @@ service firebase.storage {
     match /users/{userId}/plants/{plantId}/{fileName} {
       allow read, delete: if isOwner(userId);
       allow write: if isOwner(userId) && isImage() && withinSizeLimit();
+    }
+
+    // One profile photo, replaced in place. Owner only, same image limits.
+    match /users/{userId}/profile/{fileName} {
+      allow read, delete: if isOwner(userId);
+      allow write: if isOwner(userId)
+                   && fileName == 'avatar.jpg'
+                   && isImage()
+                   && withinSizeLimit();
     }
 
     // Readable without sign-in so the species browser can render alongside the
