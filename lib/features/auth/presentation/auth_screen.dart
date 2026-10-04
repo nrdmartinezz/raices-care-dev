@@ -146,6 +146,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           children: [
             if (_mode.isSignUp) ...[
               AuthField(
+                // Keys keep each field's state with it. Without them, inserting
+                // the name field shifts the password's obscured state onto the
+                // email, so a typed address shows up as dots.
+                key: const ValueKey('name'),
                 label: 'Your name',
                 controller: _name,
                 icon: AppIcons.actionAskElder,
@@ -160,6 +164,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               const SizedBox(height: 16),
             ],
             AuthField(
+              key: const ValueKey('email'),
               label: 'Email address',
               controller: _email,
               icon: AppIcons.fieldEmail,
@@ -173,6 +178,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             ),
             const SizedBox(height: 16),
             AuthField(
+              key: const ValueKey('password'),
               label: 'Password',
               controller: _password,
               icon: AppIcons.fieldPassword,

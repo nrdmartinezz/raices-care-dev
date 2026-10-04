@@ -58,6 +58,17 @@ class _AuthFieldState extends State<AuthField> {
   late bool _obscured = widget.isPassword;
 
   @override
+  void didUpdateWidget(AuthField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A reused state must not keep hiding text after the field stops being a
+    // password. The screen also keys its fields so this hand-off does not
+    // happen, but the field should be safe on its own.
+    if (widget.isPassword != oldWidget.isPassword) {
+      _obscured = widget.isPassword;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
