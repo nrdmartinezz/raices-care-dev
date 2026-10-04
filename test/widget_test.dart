@@ -52,11 +52,20 @@ void main() {
     await tester.pumpWidget(_appWithEmptyGarden());
     await tester.pump(); // profile resolves; the router leaves the splash
     await tester.pump(); // section streams deliver their first value
+    await tester.pump(); // the ritual card paints once that value arrives
 
     expect(find.text("Today's Ritual"), findsOneWidget);
-    expect(find.text('Nothing scheduled'), findsOneWidget);
-    expect(find.text('Growing Now'), findsOneWidget);
-    expect(find.text('No plants yet'), findsOneWidget);
+    expect(find.text('Nothing scheduled'), findsNothing);
+    expect(find.text('No plants yet', skipOffstage: false), findsNWidgets(2));
+    expect(
+      find.text(
+        'Nothing to tend yet, because the garden is empty. '
+        'Tap the add button to add your first plant.',
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Growing Now', skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('greeting reads from the clock and the profile', (tester) async {

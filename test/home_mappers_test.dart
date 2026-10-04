@@ -57,9 +57,13 @@ void main() {
     });
 
     test('ritual pill falls back to an all-clear', () {
-      expect(ritualPillLabel(null), 'All\ncaught up');
+      expect(ritualPillLabel(null, hasPlants: true), 'All\ncaught up');
+      expect(ritualPillLabel(null, hasPlants: false), 'Add a\nplant');
       expect(
-        ritualPillLabel(_reminder(dueAt: DateTime(2026, 10, 3, 8, 30))),
+        ritualPillLabel(
+          _reminder(dueAt: DateTime(2026, 10, 3, 8, 30)),
+          hasPlants: true,
+        ),
         'Morning\nwatering',
       );
     });
@@ -95,8 +99,10 @@ void main() {
         ).isDueNow,
         isFalse,
       );
-      expect(careTaskFrom(_reminder(dueAt: now), null, now: now).isDueNow,
-          isTrue);
+      expect(
+        careTaskFrom(_reminder(dueAt: now), null, now: now).isDueNow,
+        isTrue,
+      );
     });
   });
 
@@ -110,7 +116,10 @@ void main() {
             lastPrunedAt: now.subtract(const Duration(days: 2)),
           ),
         ),
-        _plant(id: 'p2', currentCare: PlantCurrentCare(lastWateredAt: now)),
+        _plant(
+          id: 'p2',
+          currentCare: PlantCurrentCare(lastWateredAt: now),
+        ),
       ];
 
       expect(careActionsToday(plants, now: now), 3);
