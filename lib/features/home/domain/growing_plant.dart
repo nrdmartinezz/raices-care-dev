@@ -59,16 +59,24 @@ class PlantStat {
 /// A plant shown in the Growing Now carousel.
 class GrowingPlant {
   const GrowingPlant({
-    required this.image,
     required this.badge,
     required this.tone,
     required this.name,
     required this.species,
     required this.vitality,
     required this.condition,
+    this.image,
+    this.coverPhotoPath,
   });
 
-  final String image;
+  /// Already-resolved artwork. Null renders the blush placeholder, which is
+  /// also what a plant with no photo yet shows.
+  final ImageProvider? image;
+
+  /// Cloud Storage path for the cover photo, if there is one. The card resolves
+  /// it to a signed URL on demand, because those URLs expire.
+  final String? coverPhotoPath;
+
   final String badge;
   final PlantStatusTone tone;
   final String name;
@@ -79,4 +87,15 @@ class GrowingPlant {
 
   /// The brown readout on the right, e.g. "Moist".
   final PlantStat condition;
+
+  GrowingPlant withImage(ImageProvider? image) => GrowingPlant(
+    badge: badge,
+    tone: tone,
+    name: name,
+    species: species,
+    vitality: vitality,
+    condition: condition,
+    image: image,
+    coverPhotoPath: coverPhotoPath,
+  );
 }

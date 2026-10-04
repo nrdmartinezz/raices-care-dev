@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../../app/assets.dart';
 import '../../../app/theme.dart';
+import '../../care/domain/care_task_type.dart';
 
 /// The kind of care a task asks for. Each category carries its own tag icon
 /// and colour pair, so the tag chip renders straight from the enum.
@@ -48,6 +49,21 @@ enum CareCategory {
   final Size iconSize;
   final Color background;
   final Color foreground;
+
+  /// Folds the eight scheduler task types into the four tags the design draws.
+  ///
+  /// Grouped by the gesture rather than the goal — repotting and feeding both
+  /// mean handling the soil, pruning and pest checks both mean handling the
+  /// leaves — so the colour still reads as a meaningful grouping rather than
+  /// an arbitrary one. Add a tag icon to the design before splitting these.
+  static CareCategory forTaskType(ReminderTaskType type) => switch (type) {
+    ReminderTaskType.waterCheck => hydration,
+    ReminderTaskType.fertilize || ReminderTaskType.repot => rotation,
+    ReminderTaskType.prune ||
+    ReminderTaskType.pestCheck ||
+    ReminderTaskType.harvest => cleaning,
+    ReminderTaskType.seasonalTask || ReminderTaskType.custom => misting,
+  };
 }
 
 /// A single entry in Today's Ritual checklist.
