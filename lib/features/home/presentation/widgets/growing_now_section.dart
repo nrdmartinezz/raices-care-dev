@@ -63,7 +63,7 @@ class GrowingNowSection extends ConsumerWidget {
             title: 'Your plants could not load',
             body: describeSectionError(error),
           ),
-          AsyncValue(:final value?) => const SectionMessage(
+          AsyncValue(:final value?) when value.isEmpty => const SectionMessage(
             title: 'No plants yet',
             body: 'Tap the add button to plant your first one.',
           ),

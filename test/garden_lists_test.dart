@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:raices/app/app.dart';
@@ -20,28 +21,40 @@ final _plant = Plant(
   status: const PlantStatus(health: PlantHealth.healthy),
 );
 
-List<Override> _gardenOverrides(Stream<List<Plant>> plants) => [
-  authStatusProvider.overrideWithValue(AuthStatus.signedIn),
-  nowProvider.overrideWithValue(DateTime(2026, 10, 3, 9)),
-  userProfileProvider.overrideWith(
-    (ref) => Stream.value(
-      AppUser(id: 'gardener', onboardingCompletedAt: DateTime.utc(2026, 1, 1)),
-    ),
-  ),
-  activePlantsProvider.overrideWith((ref) => plants),
-  todaysRemindersProvider.overrideWith((ref) => Stream.value(const [])),
-  openRemindersProvider.overrideWith((ref) => Stream.value(const [])),
-  gardenWeatherProvider.overrideWith(
-    (ref) => Future.value(
-      const GardenWeather(
-        temperatureCelsius: 22.2,
-        sky: 'Sunny',
-        place: 'Austin, TX',
-        humidityPercent: 48,
+Widget _gardenApp(
+  Stream<List<Plant>> plants, {
+  Duration? Function(int, Object)? retry,
+}) {
+  return ProviderScope(
+    retry: retry,
+    overrides: [
+      authStatusProvider.overrideWithValue(AuthStatus.signedIn),
+      nowProvider.overrideWithValue(DateTime(2026, 10, 3, 9)),
+      userProfileProvider.overrideWith(
+        (ref) => Stream.value(
+          AppUser(
+            id: 'gardener',
+            onboardingCompletedAt: DateTime.utc(2026, 1, 1),
+          ),
+        ),
       ),
-    ),
-  ),
-];
+      activePlantsProvider.overrideWith((ref) => plants),
+      todaysRemindersProvider.overrideWith((ref) => Stream.value(const [])),
+      openRemindersProvider.overrideWith((ref) => Stream.value(const [])),
+      gardenWeatherProvider.overrideWith(
+        (ref) => Future.value(
+          const GardenWeather(
+            temperatureCelsius: 22.2,
+            sky: 'Sunny',
+            place: 'Austin, TX',
+            humidityPercent: 48,
+          ),
+        ),
+      ),
+    ],
+    child: const RaicesApp(),
+  );
+}
 
 /// A read that produced an empty list and then failed, the way a snapshot
 /// error keeps the last value.
@@ -58,12 +71,7 @@ Future<void> _settle(WidgetTester tester) async {
 
 void main() {
   testWidgets('a plant with nothing due shows on both gardens', (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: _gardenOverrides(Stream.value([_plant])),
-        child: const RaicesApp(),
-      ),
-    );
+    await tester.pumpWidget(_gardenApp(Stream.value([_plant])));
     await _settle(tester);
 
     expect(find.text('All done for today'), findsOneWidget);
@@ -94,13 +102,9 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      ProviderScope(
-        // One failure is enough. The default retry would keep the stream
-        // rebuilding for several seconds.
-        retry: (_, _) => null,
-        overrides: _gardenOverrides(_emptyThenFail()),
-        child: const RaicesApp(),
-      ),
+      // One failure is enough. The default retry would keep the stream
+      // rebuilding for several seconds.
+      _gardenApp(_emptyThenFail(), retry: (_, _) => null),
     );
     await _settle(tester);
     await tester.pumpAndSettle();

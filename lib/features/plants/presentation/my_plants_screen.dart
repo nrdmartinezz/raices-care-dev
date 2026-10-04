@@ -86,7 +86,7 @@ class MyPlantsScreen extends ConsumerWidget {
               'Your plants could not load. Try again in a moment.',
               style: AppText.bodyLarge.copyWith(color: AppColors.body),
             ),
-            AsyncValue(:final value?) => const _EmptyGarden(),
+            AsyncValue(:final value?) when value.isEmpty => const _EmptyGarden(),
             _ => const Center(
               child: Padding(
                 padding: EdgeInsets.only(top: 40),
