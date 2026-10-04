@@ -7,6 +7,7 @@ import '../../care/data/reminder_repository.dart';
 import '../../care/domain/reminder.dart';
 import '../../photos/data/photo_repository.dart';
 import '../../plants/data/plant_repository.dart';
+import '../../plants/domain/plant.dart';
 import '../domain/care_task.dart';
 import '../domain/growing_plant.dart';
 import 'home_mappers.dart';
@@ -138,15 +139,28 @@ final ritualSummaryProvider = Provider<AsyncValue<RitualSummary>>((ref) {
 });
 
 /// The Growing Now cards.
+///
+/// A list that has already arrived is kept across a reload or a later error,
+/// so the cards do not vanish when the stream re-subscribes. An error that
+/// only still holds an empty list stays an error: that is a failed read, not
+/// an empty garden. [AsyncValue.whenData] drops the previous value in both of
+/// those cases, which is why this does not use it.
 final growingNowProvider = Provider<AsyncValue<List<GrowingPlant>>>((ref) {
   final now = ref.watch(nowProvider);
-  return ref
-      .watch(activePlantsProvider)
-      .whenData(
-        (plants) => [
-          for (final plant in plants) growingPlantFrom(plant, now: now),
-        ],
-      );
+  final plants = ref.watch(activePlantsProvider);
+
+  List<GrowingPlant> cards(List<Plant> list) => [
+    for (final plant in list) growingPlantFrom(plant, now: now),
+  ];
+
+  final value = plants.value;
+  if (value != null && (value.isNotEmpty || !plants.hasError)) {
+    return AsyncData(cards(value));
+  }
+  if (plants.hasError) {
+    return AsyncError(plants.error!, plants.stackTrace ?? StackTrace.empty);
+  }
+  return const AsyncLoading();
 });
 
 /// Total active plants, for the "View all N" link.

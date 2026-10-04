@@ -61,12 +61,12 @@ class MyPlantsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: AppSizes.sectionGap),
-          // The list wins over the spinner whenever there is one to show: a
-          // re-subscribing stream reports `AsyncLoading` while still carrying
-          // its last value, and the cards should not flicker away for that.
+          // A non-empty list wins over the spinner and over a later error, so a
+          // re-subscribe does not flicker the cards away. An error with no
+          // plants to show is a failed read, even when it still carries an
+          // empty list — that is not the same as a garden that loaded empty.
           switch (plantsAsync) {
-            AsyncValue(:final value?) when value.isEmpty => const _EmptyGarden(),
-            AsyncValue(:final value?) => Column(
+            AsyncValue(:final value?) when value.isNotEmpty => Column(
               children: [
                 for (final plant in value) ...[
                   _PlantRowCard(
@@ -82,10 +82,11 @@ class MyPlantsScreen extends ConsumerWidget {
                 ],
               ],
             ),
-            AsyncError() => Text(
+            AsyncValue(hasError: true) => Text(
               'Your plants could not load. Try again in a moment.',
               style: AppText.bodyLarge.copyWith(color: AppColors.body),
             ),
+            AsyncValue(:final value?) when value.isEmpty => const _EmptyGarden(),
             _ => const Center(
               child: Padding(
                 padding: EdgeInsets.only(top: 40),
