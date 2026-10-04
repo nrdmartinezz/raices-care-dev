@@ -148,6 +148,30 @@ final dueRemindersProvider = StreamProvider<List<Reminder>>((ref) {
   return ref.watch(reminderRepositoryProvider).watchDue();
 });
 
+/// Every open reminder, soonest first.
+///
+/// One query for the whole garden, so a list of plants can show each plant's
+/// next task without a read per card.
+final openRemindersProvider = StreamProvider<List<Reminder>>((ref) {
+  if (ref.watch(currentUserIdProvider) == null) {
+    return Stream.value(const []);
+  }
+  return ref.watch(reminderRepositoryProvider).watchOpen();
+});
+
+/// The soonest open reminder for each plant, keyed by plant id.
+final nextReminderByPlantProvider = Provider<Map<String, Reminder>>((ref) {
+  final reminders = ref.watch(openRemindersProvider).value ?? const [];
+  final soonest = <String, Reminder>{};
+  for (final reminder in reminders) {
+    final held = soonest[reminder.plantId];
+    if (held == null || reminder.dueAt.isBefore(held.dueAt)) {
+      soonest[reminder.plantId] = reminder;
+    }
+  }
+  return soonest;
+});
+
 /// Open reminders for one plant, soonest first, for its profile.
 final plantRemindersProvider = StreamProvider.family<List<Reminder>, String>((
   ref,

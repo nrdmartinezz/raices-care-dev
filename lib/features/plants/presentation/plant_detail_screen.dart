@@ -23,6 +23,7 @@ import '../domain/observation.dart';
 import '../domain/plant.dart';
 import '../domain/species.dart';
 import 'add_plant_flow.dart';
+import 'care_labels.dart';
 
 /// One plant: what it is, where it lives, what it needs next, and the notes
 /// kept about it.
@@ -55,22 +56,25 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
     final plantAsync = ref.watch(plantProvider(widget.plantId));
 
     return ShellScrollView(
+      // The plant wins over the spinner whenever one has arrived, since a
+      // re-subscribing stream reports `AsyncLoading` while still holding it.
+      // `hasValue` with a null plant is the different case: loaded and gone.
       child: switch (plantAsync) {
+        AsyncValue(value: final plant?) => _body(plant),
         AsyncError(:final error) => _Notice(
           title: 'This plant could not load',
           body: error is AppException
               ? error.message
               : 'Something went wrong reading your garden.',
         ),
-        AsyncLoading() => const Padding(
-          padding: EdgeInsets.only(top: 80),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-        AsyncValue(value: final plant) when plant == null => const _Notice(
+        AsyncValue(hasValue: true) => const _Notice(
           title: 'Plant not found',
           body: 'It may have been removed from your garden.',
         ),
-        AsyncValue(value: final plant!) => _body(plant),
+        _ => const Padding(
+          padding: EdgeInsets.only(top: 80),
+          child: Center(child: CircularProgressIndicator()),
+        ),
       },
     );
   }
@@ -972,46 +976,6 @@ class _Notice extends StatelessWidget {
     );
   }
 }
-
-// --------------------------------------------------------------------- labels
-
-/// "Due today", "Tomorrow", "In 4 days", "2 days late".
-String dueLabel(DateTime dueAt, {required DateTime now}) {
-  final today = DateTime(now.year, now.month, now.day);
-  final due = DateTime(dueAt.year, dueAt.month, dueAt.day);
-  final days = due.difference(today).inDays;
-  return switch (days) {
-    0 => 'Due today',
-    1 => 'Tomorrow',
-    < 0 => '${-days} ${days == -1 ? 'day' : 'days'} late',
-    _ => 'In $days days',
-  };
-}
-
-/// "Today", "Yesterday", "4 days ago", then a plain date.
-String writtenLabel(DateTime at, {required DateTime now}) {
-  final days = DateTime(
-    now.year,
-    now.month,
-    now.day,
-  ).difference(DateTime(at.year, at.month, at.day)).inDays;
-  return switch (days) {
-    <= 0 => 'TODAY',
-    1 => 'YESTERDAY',
-    < 7 => '$days DAYS AGO',
-    _ => '${at.day}/${at.month}/${at.year}',
-  };
-}
-
-/// Trefle grades light 0–10, where 10 is full sun.
-String lightLabel(int? light) => switch (light) {
-  null => 'Not known',
-  >= 9 => 'Full sun',
-  >= 7 => 'Plenty of direct sun',
-  >= 5 => 'Bright, indirect light',
-  >= 3 => 'Partial shade',
-  _ => 'Low light',
-};
 
 /// Asks for a note. Returns null when the gardener backs out.
 Future<String?> showNoteSheet(

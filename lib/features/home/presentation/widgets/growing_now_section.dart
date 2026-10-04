@@ -39,12 +39,11 @@ class GrowingNowSection extends ConsumerWidget {
                 ),
         ),
         const SizedBox(height: 8),
+        // A value is shown whenever there is one, even while the stream is
+        // re-subscribing: a refresh carries the previous data along with
+        // `AsyncLoading`, and dropping back to the skeleton makes the cards
+        // flicker away for no reason the gardener can see.
         switch (plants) {
-          AsyncError(:final error) => SectionMessage(
-            title: 'Your plants could not load',
-            body: describeSectionError(error),
-          ),
-          AsyncLoading() => const SectionSkeleton(rows: 2, height: 220),
           AsyncValue(:final value?) when value.isEmpty => const SectionMessage(
             title: 'No plants yet',
             body: 'Tap the add button to plant your first one.',
@@ -65,6 +64,11 @@ class GrowingNowSection extends ConsumerWidget {
               ],
             ],
           ),
+          AsyncError(:final error) => SectionMessage(
+            title: 'Your plants could not load',
+            body: describeSectionError(error),
+          ),
+          _ => const SectionSkeleton(rows: 2, height: 220),
         },
       ],
     );
