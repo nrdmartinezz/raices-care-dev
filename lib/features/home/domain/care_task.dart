@@ -1,0 +1,74 @@
+import 'package:flutter/widgets.dart';
+
+import '../../../app/assets.dart';
+import '../../../app/theme.dart';
+
+/// The kind of care a task asks for. Each category carries its own tag icon
+/// and colour pair, so the tag chip renders straight from the enum.
+enum CareCategory {
+  hydration(
+    label: 'Hydration',
+    icon: AppIcons.tagHydration,
+    iconSize: Size(8.667, 10.833),
+    background: Color(0x80BCEDDA),
+    foreground: AppColors.green,
+  ),
+  misting(
+    label: 'Misting',
+    icon: AppIcons.tagMisting,
+    iconSize: Size(10.833, 10.843),
+    background: Color(0x80BCEDDA),
+    foreground: AppColors.green,
+  ),
+  rotation(
+    label: 'Rotation',
+    icon: AppIcons.tagRotation,
+    iconSize: Size(9.723, 11.348),
+    background: Color(0x4DFFDEAD),
+    foreground: AppColors.amberText,
+  ),
+  cleaning(
+    label: 'Cleaning',
+    icon: AppIcons.tagCleaning,
+    iconSize: Size(9.75, 11.917),
+    background: Color(0x66FFDBCF),
+    foreground: AppColors.terracotta,
+  );
+
+  const CareCategory({
+    required this.label,
+    required this.icon,
+    required this.iconSize,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final String icon;
+  final Size iconSize;
+  final Color background;
+  final Color foreground;
+}
+
+/// A single entry in Today's Ritual checklist.
+class CareTask {
+  const CareTask({
+    required this.plantName,
+    required this.time,
+    required this.instruction,
+    required this.category,
+    required this.location,
+    required this.isDone,
+    this.isDueNow = false,
+  });
+
+  final String plantName;
+  final String time;
+  final String instruction;
+  final CareCategory category;
+  final String location;
+  final bool isDone;
+
+  /// Draws the timestamp in amber to mark the task as the one coming up.
+  final bool isDueNow;
+}
