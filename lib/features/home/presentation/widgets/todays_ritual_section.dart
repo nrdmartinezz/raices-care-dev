@@ -39,16 +39,19 @@ class TodaysRitualSection extends ConsumerWidget {
           AsyncValue(:final value?) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _ProgressStrip(value: value.progress),
-              const SizedBox(height: 12),
+              if (value.hasPlants) ...[
+                _ProgressStrip(value: value.progress),
+                const SizedBox(height: 12),
+              ],
               if (value.tasks.isEmpty)
                 SectionMessage(
-                  title: value.doneCount > 0
+                  title: value.hasPlants
                       ? 'All done for today'
-                      : 'Nothing scheduled',
-                  body: value.doneCount > 0
-                      ? 'Everything due today has been tended to.'
-                      : 'Add a plant and its care reminders appear here.',
+                      : 'No plants yet',
+                  body: value.hasPlants
+                      ? 'Nothing is due today.'
+                      : 'Nothing to tend yet, because the garden is empty. '
+                            'Tap the add button to add your first plant.',
                 )
               else
                 for (final task in value.tasks) ...[

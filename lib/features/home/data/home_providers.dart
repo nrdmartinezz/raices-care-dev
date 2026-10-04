@@ -37,15 +37,20 @@ final greetingProvider = Provider<({String date, String greeting})>((ref) {
   );
 });
 
-/// Label for the mint pill: the next thing due, or an all-clear.
+/// Label for the mint pill: the next thing due, an all-clear, or a prompt
+/// to add a plant. Blank until both streams have a value, so a loading
+/// garden is not announced as empty or caught up.
 final ritualPillProvider = Provider<String>((ref) {
+  final plants = ref.watch(activePlantsProvider).value;
   final reminders = ref.watch(todaysRemindersProvider).value;
+  if (plants == null || reminders == null) {
+    return '';
+  }
   final now = ref.watch(nowProvider);
-  final upcoming = reminders?.where((r) => r.dueAt.isAfter(now));
+  final upcoming = reminders.where((r) => r.dueAt.isAfter(now));
   return ritualPillLabel(
-    (upcoming != null && upcoming.isNotEmpty)
-        ? upcoming.first
-        : reminders?.firstOrNull,
+    upcoming.isNotEmpty ? upcoming.first : reminders.firstOrNull,
+    hasPlants: plants.isNotEmpty,
   );
 });
 
@@ -54,18 +59,40 @@ class RitualSummary {
     required this.tasks,
     required this.doneCount,
     required this.totalCount,
+    required this.hasPlants,
   });
 
   final List<CareTask> tasks;
   final int doneCount;
   final int totalCount;
 
-  double get progress => totalCount == 0 ? 0 : doneCount / totalCount;
+  /// False when the garden has no plants, which is a different empty state
+  /// from a tended garden with nothing due.
+  final bool hasPlants;
 
-  /// Null when there is nothing to count, so the heading stays bare and the
-  /// empty-state card carries the message on its own.
-  String? get progressLabel =>
-      totalCount == 0 ? null : '$doneCount of $totalCount tasks done';
+  /// Full when plants exist and nothing is open, so the bar does not sit
+  /// empty under "All done". Zero when there is no garden yet.
+  double get progress {
+    if (!hasPlants) {
+      return 0;
+    }
+    if (tasks.isEmpty) {
+      return 1;
+    }
+    return totalCount == 0 ? 0 : doneCount / totalCount;
+  }
+
+  /// Null when there is no garden, so the heading stays bare and the card
+  /// carries the reason. "All done" when plants exist and nothing is open.
+  String? get progressLabel {
+    if (!hasPlants) {
+      return null;
+    }
+    if (tasks.isEmpty) {
+      return 'All done';
+    }
+    return '$doneCount of $totalCount tasks done';
+  }
 }
 
 /// Today's Ritual: the open tasks, plus how many are already behind them.
@@ -105,6 +132,7 @@ final ritualSummaryProvider = Provider<AsyncValue<RitualSummary>>((ref) {
       tasks: tasks,
       doneCount: done,
       totalCount: done + tasks.length,
+      hasPlants: plants.isNotEmpty,
     ),
   );
 });

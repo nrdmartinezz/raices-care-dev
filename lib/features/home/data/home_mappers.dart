@@ -60,12 +60,20 @@ String _partOfDay(DateTime time) => switch (time.hour) {
 /// has no name, which is the case until the user sets one.
 String greetingFor(DateTime now, String? displayName) {
   final firstName = displayName?.trim().split(RegExp(r'\s+')).first;
-  final name = (firstName == null || firstName.isEmpty) ? 'gardener' : firstName;
+  final name = (firstName == null || firstName.isEmpty)
+      ? 'gardener'
+      : firstName;
   return 'Good ${_partOfDay(now).toLowerCase()},\n$name';
 }
 
 /// Label for the mint pill beside the greeting.
-String ritualPillLabel(Reminder? next) {
+///
+/// An empty garden is not caught up. [hasPlants] has to be known; callers
+/// should wait until the plant list has arrived.
+String ritualPillLabel(Reminder? next, {required bool hasPlants}) {
+  if (!hasPlants) {
+    return 'Add a\nplant';
+  }
   if (next == null) {
     return 'All\ncaught up';
   }
@@ -109,11 +117,16 @@ bool isSameDay(DateTime a, DateTime b) =>
 ///
 /// [plant] is the reminder's plant when it is loaded. It can be absent while
 /// the two streams are out of step, so the reminder's own title stands in.
-CareTask careTaskFrom(Reminder reminder, Plant? plant, {required DateTime now}) {
+CareTask careTaskFrom(
+  Reminder reminder,
+  Plant? plant, {
+  required DateTime now,
+}) {
   return CareTask(
     plantName: plant?.displayName ?? reminder.title,
     time: formatTimeLabel(reminder.dueAt),
-    instruction: reminder.instructions ?? _defaultInstruction(reminder.taskType),
+    instruction:
+        reminder.instructions ?? _defaultInstruction(reminder.taskType),
     category: CareCategory.forTaskType(reminder.taskType),
     location: _locationLabel(plant),
     isDone: reminder.status != ReminderStatus.open,
