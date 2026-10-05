@@ -3,17 +3,62 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/assets.dart';
 import '../../../../app/theme.dart';
+import '../../../../core/errors/app_exception.dart';
+import '../../../care/data/care_event_repository.dart';
+import '../../../care/data/chore_completion.dart';
+import '../../../care/data/reminder_repository.dart';
 import '../../data/home_providers.dart';
+import '../../domain/care_task.dart';
 import 'care_task_card.dart';
 import 'section_heading.dart';
 import 'section_state.dart';
 
 /// Section 3: the care checklist with a completion bar above it.
-class TodaysRitualSection extends ConsumerWidget {
+class TodaysRitualSection extends ConsumerStatefulWidget {
   const TodaysRitualSection({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TodaysRitualSection> createState() =>
+      _TodaysRitualSectionState();
+}
+
+class _TodaysRitualSectionState extends ConsumerState<TodaysRitualSection> {
+  final _busy = <String>{};
+  String? _error;
+
+  Future<void> _complete(CareTask task) async {
+    final plantId = task.plantId;
+    final reminderId = task.reminderId;
+    final taskType = task.taskType;
+    if (plantId == null || reminderId == null || taskType == null) {
+      return;
+    }
+    if (!_busy.add(reminderId)) {
+      return;
+    }
+    setState(() => _error = null);
+    try {
+      await recordChore(
+        events: ref.read(careEventRepositoryProvider),
+        reminders: ref.read(reminderRepositoryProvider),
+        plantId: plantId,
+        reminderId: reminderId,
+        taskType: taskType,
+        at: ref.read(nowProvider),
+      );
+    } on AppException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy.remove(reminderId));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final summary = ref.watch(ritualSummaryProvider);
 
     return Column(
@@ -55,9 +100,24 @@ class TodaysRitualSection extends ConsumerWidget {
                 )
               else
                 for (final task in value.tasks) ...[
-                  CareTaskCard(task: task),
+                  CareTaskCard(
+                    task: task,
+                    onToggle: task.reminderId == null ||
+                            _busy.contains(task.reminderId)
+                        ? null
+                        : () => _complete(task),
+                  ),
                   if (task != value.tasks.last) const SizedBox(height: 10),
                 ],
+              if (_error case final message?) ...[
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  style: AppText.body.copyWith(
+                    color: AppColors.terracottaBright,
+                  ),
+                ),
+              ],
             ],
           ),
         },

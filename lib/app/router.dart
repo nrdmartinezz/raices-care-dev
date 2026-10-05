@@ -12,6 +12,7 @@ import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/plants/presentation/add_plant_screen.dart';
 import '../features/plants/presentation/my_plants_screen.dart';
 import '../features/plants/presentation/plant_detail_screen.dart';
+import '../features/wisdom/presentation/species_article_screen.dart';
 import '../features/wisdom/presentation/wisdom_screen.dart';
 import 'shell/app_shell.dart';
 
@@ -54,6 +55,12 @@ abstract final class ChoresRoute {
 abstract final class WisdomRoute {
   static const name = 'wisdom';
   static const path = '/wisdom';
+}
+
+/// One catalog species, nested under Wisdom so the nav stays visible.
+abstract final class SpeciesArticleRoute {
+  static const name = 'speciesArticle';
+  static const path = ':speciesId';
 }
 
 abstract final class AddPlantRoute {
@@ -156,11 +163,15 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: PlantDetailRoute.path,
                     name: PlantDetailRoute.name,
-                    builder: (context, state) => PlantDetailScreen(
-                      plantId: state.pathParameters['plantId']!,
-                      // Set by the add-plant flow, so the profile can open
-                      // with its "added" banner and not show it again later.
-                      isNew: state.uri.queryParameters['new'] == '1',
+                    pageBuilder: (context, state) => _slidePage(
+                      key: state.pageKey,
+                      from: _SlideFrom.end,
+                      child: PlantDetailScreen(
+                        plantId: state.pathParameters['plantId']!,
+                        // Set by the add-plant flow, so the profile can open
+                        // with its "added" banner and not show it again later.
+                        isNew: state.uri.queryParameters['new'] == '1',
+                      ),
                     ),
                   ),
                 ],
@@ -182,6 +193,20 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: WisdomRoute.path,
                 name: WisdomRoute.name,
                 builder: (context, state) => const WisdomScreen(),
+                routes: [
+                  GoRoute(
+                    path: SpeciesArticleRoute.path,
+                    name: SpeciesArticleRoute.name,
+                    pageBuilder: (context, state) => _slidePage(
+                      key: state.pageKey,
+                      from: _SlideFrom.end,
+                      child: SpeciesArticleScreen(
+                        speciesId: state.pathParameters['speciesId']!,
+                        trefleSlug: state.uri.queryParameters['slug'],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -196,8 +221,47 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AddPlantRoute.path,
         name: AddPlantRoute.name,
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const AddPlantScreen(),
+        pageBuilder: (context, state) => _slidePage(
+          key: state.pageKey,
+          from: _SlideFrom.bottom,
+          child: const AddPlantScreen(),
+        ),
       ),
     ],
   );
 });
+
+enum _SlideFrom { bottom, end }
+
+/// A short slide used by screens that are pushed over the shell.
+CustomTransitionPage<void> _slidePage({
+  required LocalKey key,
+  required _SlideFrom from,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: key,
+    transitionDuration: const Duration(milliseconds: 280),
+    reverseTransitionDuration: const Duration(milliseconds: 240),
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      final begin = switch (from) {
+        _SlideFrom.bottom => const Offset(0, 1),
+        _SlideFrom.end =>
+          Offset(
+            Directionality.of(context) == TextDirection.rtl ? -1 : 1,
+            0,
+          ),
+      };
+      return SlideTransition(
+        position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
+        child: child,
+      );
+    },
+  );
+}

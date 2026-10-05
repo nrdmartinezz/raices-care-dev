@@ -27,7 +27,12 @@ class AppShell extends ConsumerWidget {
       backgroundColor: AppColors.canvas,
       body: Stack(
         children: [
-          Positioned.fill(child: navigationShell),
+          Positioned.fill(
+            child: _BranchFade(
+              index: navigationShell.currentIndex,
+              child: navigationShell,
+            ),
+          ),
           Positioned(
             top: 0,
             left: 0,
@@ -59,7 +64,8 @@ class AppShell extends ConsumerWidget {
   /// A tab root gets the logo bar. A screen pushed inside a branch keeps the
   /// nav but needs a way back and a title instead, so it gets [FlowHeader].
   Widget _header(BuildContext context, WidgetRef ref) {
-    if (GoRouterState.of(context).topRoute?.name == PlantDetailRoute.name) {
+    final routeName = GoRouterState.of(context).topRoute?.name;
+    if (routeName == PlantDetailRoute.name) {
       return FlowHeader(
         eyebrow: 'MY PLANTS',
         title: 'Plant profile',
@@ -68,7 +74,64 @@ class AppShell extends ConsumerWidget {
             : context.goNamed(MyPlantsRoute.name),
       );
     }
+    if (routeName == SpeciesArticleRoute.name) {
+      return FlowHeader(
+        eyebrow: 'WISDOM',
+        title: 'Species',
+        onBack: () => context.canPop()
+            ? context.pop()
+            : context.goNamed(WisdomRoute.name),
+      );
+    }
     return AppHeader(onProfile: () => showAccountSheet(context, ref));
+  }
+}
+
+/// Fades the shell body in when the active tab changes.
+///
+/// The [StatefulNavigationShell] stays the same child, so each branch keeps
+/// its stack and scroll position.
+class _BranchFade extends StatefulWidget {
+  const _BranchFade({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  State<_BranchFade> createState() => _BranchFadeState();
+}
+
+class _BranchFadeState extends State<_BranchFade>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+      value: 1,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_BranchFade oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index != widget.index) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(opacity: _controller, child: widget.child);
   }
 }
 

@@ -2,20 +2,18 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/onboarding/data/avatar_repository.dart';
 import '../assets.dart';
 import '../theme.dart';
 
-/// The frosted top bar: logo on the left, language switcher and avatar right.
+/// The frosted top bar: logo on the left, avatar on the right.
 ///
 /// Lives in the shell, so it stays put as tabs change.
 class AppHeader extends StatelessWidget {
-  const AppHeader({super.key, this.onLanguage, this.onProfile});
+  const AppHeader({super.key, this.onProfile});
 
-  final VoidCallback? onLanguage;
   final VoidCallback? onProfile;
 
   @override
@@ -42,8 +40,6 @@ class AppHeader extends StatelessWidget {
                     children: [
                       const _Logo(),
                       const Spacer(),
-                      _LanguageSwitcher(onTap: onLanguage),
-                      const SizedBox(width: 6),
                       _ProfileButton(onTap: onProfile),
                     ],
                   ),
@@ -70,44 +66,6 @@ class _Logo extends StatelessWidget {
         child: Transform.scale(
           scale: 1.4118,
           child: Image.asset(AppImages.logo, fit: BoxFit.contain),
-        ),
-      ),
-    );
-  }
-}
-
-class _LanguageSwitcher extends StatelessWidget {
-  const _LanguageSwitcher({this.onTap});
-
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: 40,
-        height: 40,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            SvgPicture.asset(AppIcons.language, width: 14, height: 17.5),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: AppColors.terracotta,
-                  shape: BoxShape.circle,
-                  boxShadow: const [
-                    BoxShadow(color: AppColors.canvas, spreadRadius: 2),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

@@ -76,6 +76,9 @@ class CareTask {
     required this.location,
     required this.isDone,
     this.isDueNow = false,
+    this.plantId,
+    this.reminderId,
+    this.taskType,
   });
 
   final String plantName;
@@ -84,6 +87,11 @@ class CareTask {
   final CareCategory category;
   final String location;
   final bool isDone;
+
+  /// Set when the row can log care or open the plant.
+  final String? plantId;
+  final String? reminderId;
+  final ReminderTaskType? taskType;
 
   /// Draws the timestamp in amber to mark the task as the one coming up.
   final bool isDueNow;

@@ -4,39 +4,25 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../app/assets.dart';
 import '../../../../app/theme.dart';
 
-/// Section 5: the two primary calls to action.
+/// Section 5: the call to add a plant.
 class QuickActionsBanner extends StatelessWidget {
-  const QuickActionsBanner({super.key, this.onNewSprout, this.onAskElder});
+  const QuickActionsBanner({super.key, this.onNewSprout});
 
   final VoidCallback? onNewSprout;
-  final VoidCallback? onAskElder;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ActionButton(
-              background: AppColors.terracotta,
-              icon: AppIcons.actionNewSprout,
-              iconSize: const Size(18.333, 16.667),
-              label: 'New sprout',
-              onTap: onNewSprout,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _ActionButton(
-              background: AppColors.green,
-              icon: AppIcons.actionAskElder,
-              iconSize: const Size(15.843, 16.667),
-              label: 'Ask the Elder',
-              onTap: onAskElder,
-            ),
-          ),
-        ],
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: _ActionButton(
+          background: AppColors.terracotta,
+          icon: AppIcons.actionNewSprout,
+          iconSize: const Size(18.333, 16.667),
+          label: 'New sprout',
+          onTap: onNewSprout,
+        ),
       ),
     );
   }

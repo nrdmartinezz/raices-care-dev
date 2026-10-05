@@ -259,18 +259,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   const SizedBox(height: 8),
                 Expanded(
                   child: onPlant
-                      ? SingleChildScrollView(
-                          child: AddPlantFlow(
-                            explain: _explain,
-                            eyebrow: 'FIRST PLANT',
-                            title: 'Add your first plant',
-                            // Onboarding draws its own progress above.
-                            showProgress: false,
-                            // Onboarding ends on the home screen either way;
-                            // the new plant is waiting there.
-                            onCreated: (plantId) => _finish(),
-                            onSkip: _finish,
-                          ),
+                      ? AddPlantFlow(
+                          explain: _explain,
+                          eyebrow: 'FIRST PLANT',
+                          title: 'Add your first plant',
+                          // Onboarding draws its own progress above.
+                          showProgress: false,
+                          // Onboarding ends on the home screen either way;
+                          // the new plant is waiting there.
+                          onCreated: (plantId) => _finish(),
+                          onSkip: _finish,
                         )
                       : SingleChildScrollView(child: _stepBody()),
                 ),

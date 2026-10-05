@@ -131,6 +131,9 @@ CareTask careTaskFrom(
     location: _locationLabel(plant),
     isDone: reminder.status != ReminderStatus.open,
     isDueNow: !reminder.dueAt.isAfter(now),
+    plantId: plant?.id ?? reminder.plantId,
+    reminderId: reminder.id,
+    taskType: reminder.taskType,
   );
 }
 

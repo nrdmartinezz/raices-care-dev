@@ -167,3 +167,8 @@ final careProfilesProvider = FutureProvider.family<List<CareProfile>, String>(
   (ref, speciesId) =>
       ref.watch(speciesRepositoryProvider).getCareProfiles(speciesId),
 );
+
+/// Provenance for one species, including the licence credit the UI must show.
+final speciesSourcesProvider = FutureProvider.family<List<SpeciesSource>, String>(
+  (ref, speciesId) => ref.watch(speciesRepositoryProvider).getSources(speciesId),
+);

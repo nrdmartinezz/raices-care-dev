@@ -8,7 +8,6 @@ import 'widgets/greeting_section.dart';
 import 'widgets/growing_now_section.dart';
 import 'widgets/quick_actions_banner.dart';
 import 'widgets/todays_ritual_section.dart';
-import 'widgets/wisdom_card.dart';
 
 /// Home — My Garden. The shell supplies the header and nav it scrolls beneath.
 class HomeScreen extends StatelessWidget {
@@ -23,8 +22,6 @@ class HomeScreen extends StatelessWidget {
           const GreetingSection(),
           const SizedBox(height: AppSizes.sectionGap),
           const TodaysRitualSection(),
-          const SizedBox(height: AppSizes.sectionGap),
-          const WisdomCard(),
           const SizedBox(height: AppSizes.sectionGap),
           GrowingNowSection(
             onViewAll: () => context.goNamed(MyPlantsRoute.name),

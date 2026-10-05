@@ -49,6 +49,7 @@ class PlantDetailScreen extends ConsumerStatefulWidget {
 
 class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
   late bool _showBanner = widget.isNew;
+  var _removing = false;
   String? _error;
 
   @override
@@ -133,6 +134,19 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
         ),
         const SizedBox(height: AppSizes.sectionGap),
         _AddAnother(onTap: () => context.pushNamed(AddPlantRoute.name)),
+        const SizedBox(height: 4),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: _removing ? null : () => _confirmRemove(plant),
+            child: Text(
+              _removing ? 'Removing…' : 'Remove plant',
+              style: AppText.titleSemiBold.copyWith(
+                color: AppColors.terracotta,
+              ),
+            ),
+          ),
+        ),
         if (species?.attribution case final attribution?) ...[
           const SizedBox(height: 16),
           Text(
@@ -160,6 +174,61 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
   /// Logging the event is the only way to move the plant's care dates: the
   /// `onCareEventCreated` trigger updates the plant and rolls the reminder
   /// forward, so nothing is written here but the event.
+  Future<void> _confirmRemove(Plant plant) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text(
+          'Remove ${plant.displayName}?',
+          style: AppText.cardTitle.copyWith(color: AppColors.ink),
+        ),
+        content: Text(
+          'This removes the plant, its photos, notes, and reminders.',
+          style: AppText.body.copyWith(color: AppColors.body),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'Keep',
+              style: AppText.label.copyWith(color: AppColors.green),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'Remove',
+              style: AppText.label.copyWith(color: AppColors.terracotta),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _removing = true;
+      _error = null;
+    });
+    try {
+      await ref.read(plantRepositoryProvider).deletePlant(plant.id);
+      if (!mounted) {
+        return;
+      }
+      context.goNamed(MyPlantsRoute.name);
+    } on AppException catch (error) {
+      if (mounted) {
+        setState(() {
+          _removing = false;
+          _error = error.message;
+        });
+      }
+    }
+  }
+
   Future<void> _logWatering(Plant plant) async {
     setState(() => _error = null);
     try {

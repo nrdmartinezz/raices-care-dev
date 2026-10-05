@@ -316,23 +316,54 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
 
   @override
   Widget build(BuildContext context) {
+    final pinned = _phase == _Phase.search ? _selected : null;
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.showProgress) ...[
-          FlowProgress(step: _phase == _Phase.search ? 1 : 2, stepCount: 3),
-          const SizedBox(height: AppSizes.sectionGap),
-        ],
-        if (_phase == _Phase.search) _searchBody() else _setupBody(),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(top: 16, bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.showProgress) ...[
+                  FlowProgress(
+                    step: _phase == _Phase.search ? 1 : 2,
+                    stepCount: 3,
+                  ),
+                  const SizedBox(height: AppSizes.sectionGap),
+                ],
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: KeyedSubtree(
+                    key: ValueKey(_phase),
+                    child: _phase == _Phase.search
+                        ? _searchBody()
+                        : _setupBody(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
         if (_error != null) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             _error!,
             style: AppText.body.copyWith(color: AppColors.terracottaBright),
           ),
         ],
-        if (widget.onSkip != null) ...[
-          const SizedBox(height: 4),
+        if (pinned != null) ...[
+          const SizedBox(height: 12),
+          _SelectionFooter(
+            name: pinned.displayName,
+            isLoading: _busy,
+            onContinue: _busy ? null : _continueToSetup,
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (widget.onSkip != null)
           SizedBox(
             width: double.infinity,
             child: TextButton(
@@ -345,7 +376,6 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
               ),
             ),
           ),
-        ],
       ],
     );
   }
@@ -439,14 +469,6 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
             ),
             const SizedBox(height: 12),
           ],
-        ],
-        if (_selected case final selected?) ...[
-          const SizedBox(height: 4),
-          _SelectionFooter(
-            name: selected.displayName,
-            isLoading: _busy,
-            onContinue: _busy ? null : _continueToSetup,
-          ),
         ],
         if (_attribution case final attribution?
             when attribution.isNotEmpty) ...[

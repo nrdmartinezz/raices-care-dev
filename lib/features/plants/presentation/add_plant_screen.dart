@@ -62,12 +62,12 @@ class _AddPlantScreenState extends ConsumerState<AddPlantScreen> {
         body: Stack(
           children: [
             Positioned.fill(
-              child: SingleChildScrollView(
+              child: Padding(
                 padding: EdgeInsets.fromLTRB(
                   AppSizes.screenPadding,
-                  AppSizes.headerHeight + insets.top + 16,
+                  AppSizes.headerHeight + insets.top,
                   AppSizes.screenPadding,
-                  32 + insets.bottom,
+                  insets.bottom,
                 ),
                 child: AddPlantFlow(
                   key: _flow,

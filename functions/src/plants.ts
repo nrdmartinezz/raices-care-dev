@@ -1,5 +1,9 @@
+import { getStorage } from "firebase-admin/storage";
 import { logger } from "firebase-functions";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import {
+  onDocumentCreated,
+  onDocumentDeleted,
+} from "firebase-functions/v2/firestore";
 
 import { db, FieldValue } from "./admin";
 import {
@@ -148,5 +152,53 @@ export const onPlantCreated = onDocumentCreated(
 
     await batch.commit();
     logger.info("Seeded plant reminders", { uid, plantId, speciesId, created });
+  },
+);
+
+/**
+ * Removes what Firestore leaves behind when a plant document is deleted.
+ *
+ * The client deletes only the plant. Care events, notes, photo documents,
+ * reminders, and Storage files are cleaned up here so one dropped connection
+ * cannot stop halfway through them.
+ */
+export const onPlantDeleted = onDocumentDeleted(
+  { document: "users/{uid}/plants/{plantId}", region: DEFAULT_REGION },
+  async (event) => {
+    const { uid, plantId } = event.params;
+    const plantRef = db.doc(`users/${uid}/plants/${plantId}`);
+
+    const collections = await plantRef.listCollections();
+    for (const collection of collections) {
+      await db.recursiveDelete(collection);
+    }
+
+    const reminders = await db
+      .collection(`users/${uid}/reminders`)
+      .where("plantId", "==", plantId)
+      .get();
+
+    const chunk = 400;
+    for (let index = 0; index < reminders.size; index += chunk) {
+      const batch = db.batch();
+      for (const doc of reminders.docs.slice(index, index + chunk)) {
+        batch.delete(doc.ref);
+      }
+      await batch.commit();
+    }
+
+    try {
+      await getStorage()
+        .bucket()
+        .deleteFiles({ prefix: `users/${uid}/plants/${plantId}/` });
+    } catch (error) {
+      logger.warn("Plant photo cleanup failed", { uid, plantId, error });
+    }
+
+    logger.info("Removed plant leftovers", {
+      uid,
+      plantId,
+      reminders: reminders.size,
+    });
   },
 );
