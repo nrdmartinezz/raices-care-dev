@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/data/auth_repository.dart';
+import '../../features/auth/domain/app_user.dart';
 import '../../features/onboarding/data/avatar_repository.dart';
 import '../assets.dart';
 import '../theme.dart';
@@ -77,39 +78,75 @@ class _ProfileButton extends ConsumerWidget {
 
   final VoidCallback? onTap;
 
+  /// Wide enough that the name sits beside the icon instead of crowding a phone.
+  static const _desktopWidth = 720.0;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final avatarPath = ref.watch(userProfileProvider).value?.avatarPath;
+    final profile = ref.watch(userProfileProvider).value;
+    final avatarPath = profile?.avatarPath;
+    final name = _profileLabel(profile);
+    final showName =
+        name != null && MediaQuery.sizeOf(context).width >= _desktopWidth;
 
     return GestureDetector(
       onTap: onTap,
-      child: SizedBox(
-        width: 40,
-        height: 40,
-        child: Center(
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF2C221E).withValues(alpha: 0.12),
-                  offset: const Offset(0, 2),
-                  blurRadius: 8,
-                ),
-              ],
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showName) ...[
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.fieldLabel.copyWith(color: AppColors.ink),
+              ),
             ),
-            child: ClipOval(
-              child: avatarPath == null
-                  ? Image.asset(AppImages.profile, fit: BoxFit.cover)
-                  : _StoredAvatar(path: avatarPath),
+            const SizedBox(width: 8),
+          ],
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2C221E).withValues(alpha: 0.12),
+                      offset: const Offset(0, 2),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: avatarPath == null
+                      ? Image.asset(AppImages.profile, fit: BoxFit.cover)
+                      : _StoredAvatar(path: avatarPath),
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
+}
+
+String? _profileLabel(AppUser? profile) {
+  final name = profile?.displayName?.trim();
+  if (name != null && name.isNotEmpty) {
+    return name;
+  }
+  final email = profile?.email?.trim();
+  if (email != null && email.isNotEmpty) {
+    return email;
+  }
+  return null;
 }
 
 class _StoredAvatar extends ConsumerWidget {

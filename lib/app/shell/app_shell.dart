@@ -146,7 +146,7 @@ class ShellScrollView extends StatelessWidget {
     final insets = MediaQuery.paddingOf(context);
     return SingleChildScrollView(
       padding: EdgeInsets.only(
-        top: AppSizes.headerHeight + insets.top,
+        top: AppSizes.headerHeight + AppSizes.headerContentGap + insets.top,
         bottom: AppSizes.navHeight + 32 + insets.bottom,
         left: AppSizes.screenPadding,
         right: AppSizes.screenPadding,

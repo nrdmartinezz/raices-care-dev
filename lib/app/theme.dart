@@ -266,6 +266,9 @@ abstract final class AppShadows {
 abstract final class AppSizes {
   static const screenPadding = 20.0;
   static const headerHeight = 80.0;
+
+  /// Space between the floating header and the first line of a tab.
+  static const headerContentGap = 20.0;
   static const navHeight = 80.0;
   static const sectionGap = 24.0;
   static const cardPadding = 14.0;
