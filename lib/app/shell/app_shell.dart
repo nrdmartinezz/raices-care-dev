@@ -61,8 +61,8 @@ class AppShell extends ConsumerWidget {
 
   /// The bar at the top of the frame.
   ///
-  /// A tab root gets the logo bar. A screen pushed inside a branch keeps the
-  /// nav but needs a way back and a title instead, so it gets [FlowHeader].
+  /// Home keeps the logo bar. The other tab roots swap it for a weather line.
+  /// A pushed screen keeps the nav, and gets [FlowHeader] for a way back.
   Widget _header(BuildContext context, WidgetRef ref) {
     final routeName = GoRouterState.of(context).topRoute?.name;
     if (routeName == PlantDetailRoute.name) {
@@ -83,7 +83,10 @@ class AppShell extends ConsumerWidget {
             : context.goNamed(WisdomRoute.name),
       );
     }
-    return AppHeader(onProfile: () => showAccountSheet(context, ref));
+    return AppHeader(
+      showWeather: routeName != HomeRoute.name,
+      onProfile: () => showAccountSheet(context, ref),
+    );
   }
 }
 

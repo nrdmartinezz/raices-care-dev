@@ -8,14 +8,19 @@ import '../../features/auth/domain/app_user.dart';
 import '../../features/onboarding/data/avatar_repository.dart';
 import '../assets.dart';
 import '../theme.dart';
+import 'header_weather.dart';
 
-/// The frosted top bar: logo on the left, avatar on the right.
+/// The frosted top bar: mark or weather on the left, avatar on the right.
 ///
-/// Lives in the shell, so it stays put as tabs change.
+/// Lives in the shell, so it stays put as tabs change. Home keeps the icon.
+/// Every other tab replaces it with a one-line weather reading.
 class AppHeader extends StatelessWidget {
-  const AppHeader({super.key, this.onProfile});
+  const AppHeader({super.key, this.onProfile, this.showWeather = false});
 
   final VoidCallback? onProfile;
+
+  /// When true, the pot icon is omitted and the weather line takes its place.
+  final bool showWeather;
 
   @override
   Widget build(BuildContext context) {
@@ -39,8 +44,17 @@ class AppHeader extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      const _Logo(),
-                      const Spacer(),
+                      if (showWeather)
+                        const Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: HeaderWeather(),
+                          ),
+                        )
+                      else ...[
+                        const _Logo(),
+                        const Spacer(),
+                      ],
                       _ProfileButton(onTap: onProfile),
                     ],
                   ),
@@ -59,16 +73,10 @@ class _Logo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 68,
-      height: 68,
-      // The design crops the mark to 141.18% of the slot to trim its margin.
-      child: ClipRect(
-        child: Transform.scale(
-          scale: 1.4118,
-          child: Image.asset(AppImages.logo, fit: BoxFit.contain),
-        ),
-      ),
+    return Image.asset(
+      AppImages.logoIcon,
+      height: 52,
+      fit: BoxFit.contain,
     );
   }
 }

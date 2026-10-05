@@ -5,9 +5,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../assets.dart';
 import '../theme.dart';
+import 'header_weather.dart';
 
 /// The frosted bar used by the add-plant steps and the plant profile: a back
-/// button, a two-line label, and the bell.
+/// button, a two-line label, and a one-line weather reading.
 ///
 /// [AppHeader] is the tab version of the same bar. This one replaces the logo
 /// with a way back and a title, so a pushed screen can say where it sits.
@@ -49,6 +50,7 @@ class FlowHeader extends StatelessWidget {
                       _BackButton(onTap: onBack),
                       const SizedBox(width: 8),
                       Expanded(
+                        flex: 3,
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,13 +74,10 @@ class FlowHeader extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // No unread dot and no tap: there is no notification
-                      // centre to send anyone to yet.
-                      const SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: Center(
-                          child: _Glyph(AppIcons.flowBell, size: 18),
+                      const Flexible(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: HeaderWeather(),
                         ),
                       ),
                     ],

@@ -89,6 +89,7 @@ abstract final class AppIcons {
 
 abstract final class AppImages {
   static const logo = 'assets/images/raices_logo.png';
+  static const logoIcon = 'assets/images/logo_icon.png';
   static const profile = 'assets/images/profile.png';
   static const plantMonstera = 'assets/images/plant_monstera.png';
   static const plantHabanero = 'assets/images/plant_habanero.png';
