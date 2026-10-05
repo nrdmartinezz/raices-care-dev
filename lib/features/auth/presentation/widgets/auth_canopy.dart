@@ -12,24 +12,27 @@ class AuthCanopy extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.canopyDeep, AppColors.canopySage],
+    return const SizedBox(
+      width: double.infinity,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.canopyDeep, AppColors.canopySage],
+          ),
         ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.only(top: 16, bottom: 36),
-              child: AuthLogo(),
-            ),
-            SizedBox(height: 34),
-          ],
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.only(top: 16, bottom: 36),
+                child: AuthLogo(),
+              ),
+              SizedBox(height: 34),
+            ],
+          ),
         ),
       ),
     );
