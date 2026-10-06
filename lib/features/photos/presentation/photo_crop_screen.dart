@@ -5,8 +5,10 @@ import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/errors/app_exception.dart';
 import '../../../core/widgets/app_dialog.dart';
 import '../domain/photo_encode.dart';
+import '../domain/photo_work.dart';
 
 /// Full-screen crop. Pops the cropped bytes, or null when cancelled.
 class PhotoCropScreen extends StatefulWidget {
@@ -21,8 +23,8 @@ class PhotoCropScreen extends StatefulWidget {
 }
 
 class _PhotoCropScreenState extends State<PhotoCropScreen> {
-  final _controller = CropController();
   Uint8List? _bytes;
+  Rect? _imageRect;
   var _ready = false;
   var _saving = false;
   var _left = false;
@@ -44,7 +46,15 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
         _leave();
         return;
       }
-      setState(() => _bytes = bytes);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || _left) {
+        return;
+      }
+      final preview = await prepareCropPreview(bytes);
+      if (!mounted || _left) {
+        return;
+      }
+      setState(() => _bytes = preview);
     } on Object {
       if (!mounted || _left) {
         return;
@@ -61,29 +71,43 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
     Navigator.of(context).pop(result);
   }
 
-  void _save() {
-    if (!_ready || _saving) {
+  Future<void> _save() async {
+    final bytes = _bytes;
+    final source = _imageRect;
+    if (!_ready || _saving || bytes == null || source == null) {
       return;
     }
     setState(() {
       _saving = true;
       _error = null;
     });
-    _controller.crop();
-  }
-
-  void _onCropped(CropResult result) {
-    if (!mounted) {
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || _left) {
       return;
     }
-    switch (result) {
-      case CropSuccess(:final croppedImage):
-        _leave(croppedImage);
-      case CropFailure():
-        setState(() {
-          _saving = false;
-          _error = 'That crop could not be saved.';
-        });
+    try {
+      final jpeg = await finishGardenCrop(
+        bytes: bytes,
+        source: source,
+        crop: widget.crop,
+      );
+      _leave(jpeg);
+    } on AppException catch (error) {
+      if (!mounted || _left) {
+        return;
+      }
+      setState(() {
+        _saving = false;
+        _error = error.message;
+      });
+    } on Object {
+      if (!mounted || _left) {
+        return;
+      }
+      setState(() {
+        _saving = false;
+        _error = 'That crop could not be saved.';
+      });
     }
   }
 
@@ -112,7 +136,6 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                     )
                   : Crop(
                       image: _bytes!,
-                      controller: _controller,
                       aspectRatio: widget.crop.aspectRatio,
                       withCircleUi: widget.crop.circularMask,
                       interactive: true,
@@ -136,7 +159,10 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                         }
                         setState(() => _ready = status == CropStatus.ready);
                       },
-                      onCropped: _onCropped,
+                      onMoved: (_, imageRect) {
+                        _imageRect = imageRect;
+                      },
+                      onCropped: (_) {},
                     ),
             ),
             if (_error != null)
@@ -164,7 +190,7 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                     child: AppDialogButton(
                       label: _saving ? 'Saving…' : 'Use photo',
                       filled: true,
-                      onPressed: _save,
+                      onPressed: () => unawaited(_save()),
                     ),
                   ),
                 ],

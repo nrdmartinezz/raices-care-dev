@@ -34,6 +34,23 @@ void main() {
     expect(jpeg.length, lessThan(1024 * 1024));
   });
 
+  test('a framed region becomes the upload JPEG off the preview pixels', () {
+    final jpeg = cropAndEncodeGardenJpeg(
+      _solidPng(width: 1600, height: 1200),
+      left: 200,
+      top: 100,
+      width: 800,
+      height: 800,
+      crop: PhotoCrop.square,
+    );
+    final decoded = img.decodeImage(jpeg);
+
+    expect(decoded, isNotNull);
+    expect(decoded!.width, 512);
+    expect(decoded.height, 512);
+    expect(_isJpeg(jpeg), isTrue);
+  });
+
   test('a photo that cannot be read is rejected', () {
     expect(
       () => encodeGardenJpeg(

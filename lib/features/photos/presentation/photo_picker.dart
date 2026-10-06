@@ -19,9 +19,6 @@ class PickedGardenPhoto {
   final String contentType;
 }
 
-/// Longest edge handed to the crop screen. The upload is smaller still.
-const _pickerMaxEdge = 2048.0;
-
 /// Asks for a source, crops, then returns a small JPEG.
 ///
 /// Null when the gardener backs out of the source dialog or the crop.
@@ -60,9 +57,8 @@ Future<PickedGardenPhoto?> pickGardenPhoto(
   }
 
   try {
-    // Start the picker, then cover the page immediately. The web picker
-    // resizes the file after the dialog closes, and that wait used to sit
-    // on the previous screen with nothing on it.
+    // Open the crop screen before any decoding. Resizing happens there, off
+    // the UI thread, so the spinner can keep moving.
     final selection = _selectedPhoto(source);
     if (!context.mounted) {
       return null;
@@ -81,10 +77,7 @@ Future<PickedGardenPhoto?> pickGardenPhoto(
     if (cropped == null) {
       return null;
     }
-    return PickedGardenPhoto(
-      bytes: encodeGardenJpeg(cropped, crop: crop),
-      contentType: 'image/jpeg',
-    );
+    return PickedGardenPhoto(bytes: cropped, contentType: 'image/jpeg');
   } on AppException {
     rethrow;
   } on Object {
@@ -92,13 +85,12 @@ Future<PickedGardenPhoto?> pickGardenPhoto(
   }
 }
 
-/// The chosen file, already limited to [_pickerMaxEdge], or null if cancelled.
+/// The chosen file, or null if cancelled.
+///
+/// No resize here. The web picker would decode and paint that on the UI
+/// thread before this future completed.
 Future<Uint8List?> _selectedPhoto(ImageSource source) async {
-  final file = await ImagePicker().pickImage(
-    source: source,
-    maxWidth: _pickerMaxEdge,
-    maxHeight: _pickerMaxEdge,
-  );
+  final file = await ImagePicker().pickImage(source: source);
   if (file == null) {
     return null;
   }
