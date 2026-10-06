@@ -186,7 +186,7 @@ screen is meant to do.
 | File | Purpose |
 | --- | --- |
 | `firestore.rules` | Per-user isolation, shape validation, read-only catalog |
-| `storage.rules` | Owner-only plant photos, 10 MB image ceiling |
+| `functions/src/images.ts` | Signs avatar and plant photo uploads to R2 |
 | `firestore.indexes.json` | Composite and collection-group indexes |
 | `functions/` | TypeScript Cloud Functions |
 
@@ -215,6 +215,8 @@ deleted and re-logged rather than silently rewritten.
 | `generateDueReminderNotifications` | every 15 min | Finds due reminders, respects quiet hours |
 | `resolveSpecies` | callable | Caches a species from Trefle into `/species` |
 | `searchSpeciesCatalog` | callable | Searches Trefle; writes nothing |
+| `prepareImageUpload` | callable | Signs a JPEG upload to R2 for the signed-in user |
+| `deleteImage` | callable | Deletes one of that user's objects from R2 |
 
 Notification delivery is **off**. `functions/src/reminders.ts` sets `SENDING_ENABLED = false`,
 so the sweep logs what it would send instead of sending it. Flip that only after testing
@@ -234,7 +236,7 @@ Run the whole backend locally. Nothing here touches the real project.
 firebase emulators:start
 ```
 
-Ports: Auth 9099, Firestore 8080, Storage 9199, Functions 5001, UI at <http://localhost:4000>.
+Ports: Auth 9099, Firestore 8080, Functions 5001, UI at <http://localhost:4000>.
 
 The app only connects to the emulators when told to, so a normal `flutter run` still points at
 the real project:
@@ -288,16 +290,17 @@ Set the token for a single shell only. Do not put it in a file.
 
 Nothing deploys automatically. Review each artifact, then deploy it deliberately.
 
-Store the Trefle token first — the callables will not start without it:
+Store the secrets first. The catalog callables will not start without the Trefle token, and image uploads will not start without the R2 token:
 
 ```powershell
 firebase functions:secrets:set TREFLE_API_TOKEN
+firebase functions:secrets:set R2_ACCESS_KEY_ID
+firebase functions:secrets:set R2_SECRET_ACCESS_KEY
 ```
 
 ```powershell
 firebase deploy --only firestore:rules
 firebase deploy --only firestore:indexes
-firebase deploy --only storage
 firebase deploy --only functions
 ```
 

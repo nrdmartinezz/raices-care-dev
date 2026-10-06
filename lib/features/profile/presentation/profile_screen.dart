@@ -52,7 +52,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _changePhoto(AppUser user) async {
     setState(() => _photoError = null);
     try {
-      final photo = await pickGardenPhoto(context);
+      final photo = await pickGardenPhoto(context, crop: PhotoCrop.square);
       if (photo == null || !mounted) {
         return;
       }

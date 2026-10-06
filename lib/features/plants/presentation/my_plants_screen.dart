@@ -86,7 +86,8 @@ class MyPlantsScreen extends ConsumerWidget {
               'Your plants could not load. Try again in a moment.',
               style: AppText.bodyLarge.copyWith(color: AppColors.body),
             ),
-            AsyncValue(:final value?) when value.isEmpty => const _EmptyGarden(),
+            AsyncValue(:final value?) when value.isEmpty =>
+              const _EmptyGarden(),
             _ => const Center(
               child: Padding(
                 padding: EdgeInsets.only(top: 40),
@@ -152,7 +153,7 @@ class _PlantRowCard extends ConsumerWidget {
     final path = plant.coverPhotoPath;
     final image = path == null
         ? null
-        : ref.watch(plantCoverImageProvider(path)).value;
+        : ref.watch(plantCoverImageProvider(path));
     final garden = GardenSpot.fromWire(plant.gardenId);
     final radius = BorderRadius.circular(AppSizes.cardRadius + 4);
 

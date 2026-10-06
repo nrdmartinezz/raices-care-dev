@@ -6,6 +6,10 @@ import 'package:image_picker/image_picker.dart';
 import '../../../app/assets.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/widgets/app_dialog.dart';
+import '../domain/photo_encode.dart';
+import 'photo_crop_screen.dart';
+
+export '../domain/photo_encode.dart' show PhotoCrop;
 
 /// Bytes chosen from the camera or the library, ready to upload.
 class PickedGardenPhoto {
@@ -15,8 +19,16 @@ class PickedGardenPhoto {
   final String contentType;
 }
 
-/// Asks for a source, then returns the image. Null when the gardener backs out.
-Future<PickedGardenPhoto?> pickGardenPhoto(BuildContext context) async {
+/// Longest edge handed to the crop screen. The upload is smaller still.
+const _pickerMaxEdge = 2048.0;
+
+/// Asks for a source, crops, then returns a small JPEG.
+///
+/// Null when the gardener backs out of the source dialog or the crop.
+Future<PickedGardenPhoto?> pickGardenPhoto(
+  BuildContext context, {
+  PhotoCrop crop = PhotoCrop.square,
+}) async {
   final source = await showDialog<ImageSource>(
     context: context,
     barrierColor: appDialogBarrier,
@@ -43,50 +55,40 @@ Future<PickedGardenPhoto?> pickGardenPhoto(BuildContext context) async {
       ),
     ),
   );
-  if (source == null) {
+  if (source == null || !context.mounted) {
     return null;
   }
 
   try {
     final file = await ImagePicker().pickImage(
       source: source,
-      maxWidth: 1600,
-      imageQuality: 85,
+      maxWidth: _pickerMaxEdge,
+      maxHeight: _pickerMaxEdge,
     );
-    if (file == null) {
+    if (file == null || !context.mounted) {
       return null;
     }
     final bytes = await file.readAsBytes();
+    if (!context.mounted) {
+      return null;
+    }
+    final cropped = await Navigator.of(context, rootNavigator: true)
+        .push<Uint8List>(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (context) => PhotoCropScreen(bytes: bytes, crop: crop),
+          ),
+        );
+    if (cropped == null) {
+      return null;
+    }
     return PickedGardenPhoto(
-      bytes: bytes,
-      contentType: _contentType(file.mimeType, file.name),
+      bytes: encodeGardenJpeg(cropped, crop: crop),
+      contentType: 'image/jpeg',
     );
+  } on AppException {
+    rethrow;
   } on Object {
     throw const UnexpectedException('That photo could not be opened.');
   }
-}
-
-String _contentType(String? mime, String name) {
-  final normalized = switch (mime?.toLowerCase()) {
-    'image/jpg' || 'image/jpeg' => 'image/jpeg',
-    'image/png' => 'image/png',
-    'image/webp' => 'image/webp',
-    'image/heic' || 'image/heif' => 'image/heic',
-    _ => null,
-  };
-  if (normalized != null) {
-    return normalized;
-  }
-
-  final lower = name.toLowerCase();
-  if (lower.endsWith('.png')) {
-    return 'image/png';
-  }
-  if (lower.endsWith('.webp')) {
-    return 'image/webp';
-  }
-  if (lower.endsWith('.heic') || lower.endsWith('.heif')) {
-    return 'image/heic';
-  }
-  return 'image/jpeg';
 }

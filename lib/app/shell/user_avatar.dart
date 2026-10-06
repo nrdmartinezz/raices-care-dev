@@ -26,16 +26,12 @@ class UserAvatar extends ConsumerWidget {
 
     final url = ref.watch(avatarUrlProvider(stored));
     return ClipOval(
-      child: url.when(
-        data: (value) => Image.network(
-          value,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => placeholder,
-        ),
-        loading: () => placeholder,
-        error: (error, stackTrace) => placeholder,
+      child: Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => placeholder,
       ),
     );
   }

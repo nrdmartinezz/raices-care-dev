@@ -177,6 +177,11 @@ AppException mapFirebaseException(Object error, StackTrace stackTrace) {
   if (error is FirebaseFunctionsException) {
     return switch (error.code) {
       'unauthenticated' => const UnauthenticatedException(),
+      'invalid-argument' => MalformedDataException(
+        _functionMessage(error) ?? 'That photo could not be saved.',
+        cause: error,
+        stackTrace: stackTrace,
+      ),
       'permission-denied' => const PermissionDeniedException(),
       'not-found' => const NotFoundException(),
       'resource-exhausted' => const RateLimitedException(),

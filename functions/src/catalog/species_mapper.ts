@@ -113,7 +113,7 @@ export function mapTrefleToSpecies(
 
     // Trefle serves images from third-party hosts that carry their own
     // attribution, so the URL is recorded rather than hotlinked blindly.
-    // TODO: mirror into Storage at species/{speciesId}/cover.jpg once the
+    // TODO: mirror into R2 at species/{speciesId}/cover.jpg once the
     // per-image licence of each upstream host has been checked.
     imageUrl: detail.image_url,
     imagePath: null,

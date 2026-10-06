@@ -5,7 +5,7 @@ import '../../../core/utils/firestore_values.dart';
 /// Metadata for one uploaded photo, at
 /// /users/{uid}/plants/{plantId}/photos/{photoId}.
 ///
-/// Only metadata lives in Firestore; the image itself is in Storage at
+/// Only metadata lives in Firestore; the image itself is in R2 at
 /// [storagePath]. The security rules require that path to sit inside the
 /// owner's own folder for this plant, which ties the two together.
 class PlantPhoto {
@@ -23,7 +23,7 @@ class PlantPhoto {
 
   final String id;
 
-  /// Storage path, not a download URL. URLs expire; paths do not.
+  /// Object key, not a public URL. The custom domain is added when showing it.
   final String storagePath;
   final String? caption;
   final DateTime? takenAt;

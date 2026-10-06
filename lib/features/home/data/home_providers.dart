@@ -5,7 +5,8 @@ import '../../../core/firebase/firebase_providers.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../care/data/reminder_repository.dart';
 import '../../care/domain/reminder.dart';
-import '../../photos/data/photo_repository.dart';
+import '../../photos/data/image_revision.dart';
+import '../../photos/domain/garden_image_url.dart';
 import '../../plants/data/plant_repository.dart';
 import '../../plants/domain/plant.dart';
 import '../domain/care_task.dart';
@@ -168,17 +169,16 @@ final activePlantCountProvider = Provider<int>(
   (ref) => ref.watch(activePlantsProvider).value?.length ?? 0,
 );
 
-/// Resolves a cover photo's Storage path to an image.
+/// Resolves a cover photo's object key to an image on the custom domain.
 ///
-/// Download URLs are time-limited, so only the path is stored and the URL is
-/// fetched when a card actually needs it. Keeping this in a provider means the
-/// result is cached for as long as a card is on screen.
-final plantCoverImageProvider = FutureProvider.family<ImageProvider?, String>((
+/// Only the path is stored. A version query is added when this session
+/// replaced the file, so the card shows the new JPEG.
+final plantCoverImageProvider = Provider.family<ImageProvider, String>((
   ref,
   storagePath,
-) async {
-  final url = await ref.watch(photoRepositoryProvider).downloadUrl(storagePath);
-  return NetworkImage(url);
+) {
+  final version = ref.watch(imageRevisionProvider)[storagePath];
+  return NetworkImage(gardenImageUrl(storagePath, version: version));
 });
 
 /// Convenience view of whether the garden is empty, used to pick between the

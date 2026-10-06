@@ -65,14 +65,11 @@ class _Photo extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // A supplied image wins; otherwise resolve the Storage path, which yields
-    // a URL that expires and so cannot be stored on the plant.
+    // A supplied image wins; otherwise the stored object key on the custom domain.
     final path = plant.coverPhotoPath;
     final image =
         plant.image ??
-        (path == null
-            ? null
-            : ref.watch(plantCoverImageProvider(path)).value);
+        (path == null ? null : ref.watch(plantCoverImageProvider(path)));
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppSizes.imageRadius),

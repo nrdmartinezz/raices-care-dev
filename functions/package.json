@@ -10,12 +10,14 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "serve": "npm run build && firebase emulators:start --only functions,firestore,auth,storage",
+    "serve": "npm run build && firebase emulators:start --only functions,firestore,auth",
     "seed": "npm run build && node lib/scripts/seed_catalog.js",
     "shell": "npm run build && firebase functions:shell",
     "logs": "firebase functions:log"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
     "firebase-admin": "^13.6.0",
     "firebase-functions": "^6.6.0"
   },

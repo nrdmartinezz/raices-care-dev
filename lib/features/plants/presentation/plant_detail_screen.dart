@@ -127,11 +127,7 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
         const SizedBox(height: AppSizes.sectionGap),
         _Upcoming(reminders: reminders, now: now),
         const SizedBox(height: AppSizes.sectionGap),
-        _Journal(
-          plantId: plant.id,
-          now: now,
-          onAdd: () => _writeNote(plant),
-        ),
+        _Journal(plantId: plant.id, now: now, onAdd: () => _writeNote(plant)),
         const SizedBox(height: AppSizes.sectionGap),
         _AddAnother(onTap: () => context.pushNamed(AddPlantRoute.name)),
         const SizedBox(height: 4),
@@ -232,14 +228,16 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
   Future<void> _logWatering(Plant plant) async {
     setState(() => _error = null);
     try {
-      await ref.read(careEventRepositoryProvider).logEvent(
-        plantId: plant.id,
-        event: CareEvent(
-          id: '',
-          eventType: CareEventType.watered,
-          occurredAt: DateTime.now(),
-        ),
-      );
+      await ref
+          .read(careEventRepositoryProvider)
+          .logEvent(
+            plantId: plant.id,
+            event: CareEvent(
+              id: '',
+              eventType: CareEventType.watered,
+              occurredAt: DateTime.now(),
+            ),
+          );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Watering logged for ${plant.displayName}.')),
@@ -340,7 +338,7 @@ class _Hero extends ConsumerWidget {
     final path = plant.coverPhotoPath;
     final stored = path == null
         ? null
-        : ref.watch(plantCoverImageProvider(path)).value;
+        : ref.watch(plantCoverImageProvider(path));
     final catalogUrl = species?.imageUrl;
     final scientific = species?.scientificName;
 
@@ -958,7 +956,10 @@ class _NoteRow extends StatelessWidget {
             style: AppText.eyebrow.copyWith(color: AppColors.muted),
           ),
           const SizedBox(height: 4),
-          Text(note.note, style: AppText.bodyLarge.copyWith(color: AppColors.body)),
+          Text(
+            note.note,
+            style: AppText.bodyLarge.copyWith(color: AppColors.body),
+          ),
         ],
       ),
     );

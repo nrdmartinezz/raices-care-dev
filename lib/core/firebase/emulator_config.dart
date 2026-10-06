@@ -5,16 +5,13 @@ import 'package:flutter/foundation.dart';
 abstract final class EmulatorPorts {
   static const auth = 9099;
   static const firestore = 8080;
-  static const storage = 9199;
   static const functions = 5001;
 }
 
 /// Opted into per run, never baked into a build:
 ///
 ///   flutter run --dart-define=USE_FIREBASE_EMULATORS=true
-const bool _emulatorsRequested = bool.fromEnvironment(
-  'USE_FIREBASE_EMULATORS',
-);
+const bool _emulatorsRequested = bool.fromEnvironment('USE_FIREBASE_EMULATORS');
 
 /// Host override for a physical device, which cannot reach the host loopback:
 ///

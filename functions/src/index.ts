@@ -13,3 +13,4 @@ export { onPlantCreated, onPlantDeleted } from "./plants";
 export { onCareEventCreated } from "./care";
 export { generateDueReminderNotifications } from "./reminders";
 export { resolveSpecies, searchSpeciesCatalog } from "./catalog/resolve_species";
+export { prepareImageUpload, deleteImage } from "./images";

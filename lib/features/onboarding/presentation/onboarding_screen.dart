@@ -106,7 +106,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Future<void> _pickPhoto() async {
     try {
-      final picked = await pickGardenPhoto(context);
+      final picked = await pickGardenPhoto(context, crop: PhotoCrop.square);
       if (picked != null && mounted) {
         setState(() => _photo = picked);
       }
