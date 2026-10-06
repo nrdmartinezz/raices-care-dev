@@ -6,6 +6,7 @@ import '../../../app/assets.dart';
 import '../../../app/shell/app_shell.dart';
 import '../../../app/theme.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/domain/app_user.dart';
 import '../../auth/domain/auth_validators.dart';
@@ -261,7 +262,7 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
   Future<void> _deleteAccount() async {
     final confirmed = await showAccountConfirmDialog(
       context,
-      icon: const AccountAlertBadge(icon: AppIcons.accountAlert),
+      icon: const AppIconBadge(icon: AppIcons.accountAlert),
       title: 'Delete account?',
       message: 'Are you sure you want to delete your account?',
       confirmLabel: 'Delete account',

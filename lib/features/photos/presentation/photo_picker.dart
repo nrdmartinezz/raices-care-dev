@@ -3,8 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../app/theme.dart';
+import '../../../app/assets.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../core/widgets/app_dialog.dart';
 
 /// Bytes chosen from the camera or the library, ready to upload.
 class PickedGardenPhoto {
@@ -16,37 +17,27 @@ class PickedGardenPhoto {
 
 /// Asks for a source, then returns the image. Null when the gardener backs out.
 Future<PickedGardenPhoto?> pickGardenPhoto(BuildContext context) async {
-  final source = await showModalBottomSheet<ImageSource>(
+  final source = await showDialog<ImageSource>(
     context: context,
-    backgroundColor: AppColors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (sheetContext) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+    barrierColor: appDialogBarrier,
+    builder: (dialogContext) => AppDialog(
+      icon: const AppIconBadge(icon: AppIcons.setupCamera),
+      title: 'Add a photo',
+      message: 'Take a new photo, or choose one from your library.',
+      actions: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-            child: Text(
-              'ADD A PHOTO',
-              style: AppText.eyebrow.copyWith(color: AppColors.terracotta),
-            ),
+          AppDialogButton(
+            label: 'Take a photo',
+            filled: false,
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(ImageSource.camera),
           ),
-          ListTile(
-            title: Text(
-              'Take a photo',
-              style: AppText.title.copyWith(color: AppColors.ink),
-            ),
-            onTap: () => Navigator.of(sheetContext).pop(ImageSource.camera),
-          ),
-          ListTile(
-            title: Text(
-              'Choose from library',
-              style: AppText.title.copyWith(color: AppColors.ink),
-            ),
-            onTap: () => Navigator.of(sheetContext).pop(ImageSource.gallery),
+          const SizedBox(height: 12),
+          AppDialogButton(
+            label: 'Choose from library',
+            filled: true,
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(ImageSource.gallery),
           ),
         ],
       ),
