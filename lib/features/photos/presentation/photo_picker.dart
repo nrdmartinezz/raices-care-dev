@@ -60,23 +60,22 @@ Future<PickedGardenPhoto?> pickGardenPhoto(
   }
 
   try {
-    final file = await ImagePicker().pickImage(
-      source: source,
-      maxWidth: _pickerMaxEdge,
-      maxHeight: _pickerMaxEdge,
-    );
-    if (file == null || !context.mounted) {
-      return null;
-    }
-    final bytes = await file.readAsBytes();
+    // Start the picker, then cover the page immediately. The web picker
+    // resizes the file after the dialog closes, and that wait used to sit
+    // on the previous screen with nothing on it.
+    final selection = _selectedPhoto(source);
     if (!context.mounted) {
       return null;
     }
     final cropped = await Navigator.of(context, rootNavigator: true)
         .push<Uint8List>(
-          MaterialPageRoute(
+          PageRouteBuilder<Uint8List>(
             fullscreenDialog: true,
-            builder: (context) => PhotoCropScreen(bytes: bytes, crop: crop),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: const Duration(milliseconds: 180),
+            pageBuilder: (context, animation, secondaryAnimation) {
+              return PhotoCropScreen(image: selection, crop: crop);
+            },
           ),
         );
     if (cropped == null) {
@@ -91,4 +90,17 @@ Future<PickedGardenPhoto?> pickGardenPhoto(
   } on Object {
     throw const UnexpectedException('That photo could not be opened.');
   }
+}
+
+/// The chosen file, already limited to [_pickerMaxEdge], or null if cancelled.
+Future<Uint8List?> _selectedPhoto(ImageSource source) async {
+  final file = await ImagePicker().pickImage(
+    source: source,
+    maxWidth: _pickerMaxEdge,
+    maxHeight: _pickerMaxEdge,
+  );
+  if (file == null) {
+    return null;
+  }
+  return file.readAsBytes();
 }

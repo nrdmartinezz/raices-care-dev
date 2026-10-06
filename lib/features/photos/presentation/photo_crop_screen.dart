@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:crop_your_image/crop_your_image.dart';
@@ -9,9 +10,10 @@ import '../domain/photo_encode.dart';
 
 /// Full-screen crop. Pops the cropped bytes, or null when cancelled.
 class PhotoCropScreen extends StatefulWidget {
-  const PhotoCropScreen({super.key, required this.bytes, required this.crop});
+  const PhotoCropScreen({super.key, required this.image, required this.crop});
 
-  final Uint8List bytes;
+  /// The picked file. Null when the gardener cancels the source dialog.
+  final Future<Uint8List?> image;
   final PhotoCrop crop;
 
   @override
@@ -20,9 +22,44 @@ class PhotoCropScreen extends StatefulWidget {
 
 class _PhotoCropScreenState extends State<PhotoCropScreen> {
   final _controller = CropController();
+  Uint8List? _bytes;
   var _ready = false;
   var _saving = false;
+  var _left = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_openImage());
+  }
+
+  Future<void> _openImage() async {
+    try {
+      final bytes = await widget.image;
+      if (!mounted || _left) {
+        return;
+      }
+      if (bytes == null) {
+        _leave();
+        return;
+      }
+      setState(() => _bytes = bytes);
+    } on Object {
+      if (!mounted || _left) {
+        return;
+      }
+      setState(() => _error = 'That photo could not be opened.');
+    }
+  }
+
+  void _leave([Uint8List? result]) {
+    if (_left || !mounted) {
+      return;
+    }
+    _left = true;
+    Navigator.of(context).pop(result);
+  }
 
   void _save() {
     if (!_ready || _saving) {
@@ -41,7 +78,7 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
     }
     switch (result) {
       case CropSuccess(:final croppedImage):
-        Navigator.of(context).pop(croppedImage);
+        _leave(croppedImage);
       case CropFailure():
         setState(() {
           _saving = false;
@@ -65,32 +102,42 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
               ),
             ),
             Expanded(
-              child: Crop(
-                image: widget.bytes,
-                controller: _controller,
-                aspectRatio: widget.crop.aspectRatio,
-                withCircleUi: widget.crop.circularMask,
-                interactive: true,
-                fixCropRect: true,
-                baseColor: AppColors.canvas,
-                maskColor: AppColors.ink.withValues(alpha: 0.45),
-                initialRectBuilder: InitialRectBuilder.withSizeAndRatio(
-                  size: 0.85,
-                  aspectRatio: widget.crop.aspectRatio,
-                ),
-                cornerDotBuilder: (size, edgeAlignment) =>
-                    DotControl(color: AppColors.terracotta),
-                progressIndicator: const Center(
-                  child: CircularProgressIndicator(color: AppColors.terracotta),
-                ),
-                onStatusChanged: (status) {
-                  if (!mounted) {
-                    return;
-                  }
-                  setState(() => _ready = status == CropStatus.ready);
-                },
-                onCropped: _onCropped,
-              ),
+              child: _bytes == null
+                  ? Center(
+                      child: _error == null
+                          ? const CircularProgressIndicator(
+                              color: AppColors.terracotta,
+                            )
+                          : const SizedBox.shrink(),
+                    )
+                  : Crop(
+                      image: _bytes!,
+                      controller: _controller,
+                      aspectRatio: widget.crop.aspectRatio,
+                      withCircleUi: widget.crop.circularMask,
+                      interactive: true,
+                      fixCropRect: true,
+                      baseColor: AppColors.canvas,
+                      maskColor: AppColors.ink.withValues(alpha: 0.45),
+                      initialRectBuilder: InitialRectBuilder.withSizeAndRatio(
+                        size: 0.85,
+                        aspectRatio: widget.crop.aspectRatio,
+                      ),
+                      cornerDotBuilder: (size, edgeAlignment) =>
+                          DotControl(color: AppColors.terracotta),
+                      progressIndicator: const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.terracotta,
+                        ),
+                      ),
+                      onStatusChanged: (status) {
+                        if (!mounted) {
+                          return;
+                        }
+                        setState(() => _ready = status == CropStatus.ready);
+                      },
+                      onCropped: _onCropped,
+                    ),
             ),
             if (_error != null)
               Padding(
@@ -109,7 +156,7 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                     child: AppDialogButton(
                       label: 'Cancel',
                       filled: false,
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _leave,
                     ),
                   ),
                   const SizedBox(width: 12),
