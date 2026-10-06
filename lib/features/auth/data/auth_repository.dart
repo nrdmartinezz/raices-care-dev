@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -18,6 +20,38 @@ class AuthRepository {
   User? get currentUser => _auth.currentUser;
 
   Stream<User?> authStateChanges() => _auth.authStateChanges();
+
+  /// Fires when the account itself changes, including a confirmed email update.
+  Stream<User?> userChanges() => _auth.userChanges();
+
+  /// Email/password accounts can set a new password. Google and Apple cannot.
+  bool get canChangePassword =>
+      _auth.currentUser?.providerData.any(
+        (provider) => provider.providerId == EmailAuthProvider.PROVIDER_ID,
+      ) ??
+      false;
+
+  /// Google or Apple, when the account has no password to change.
+  String? get externalProviderLabel {
+    if (canChangePassword) {
+      return null;
+    }
+    final ids =
+        _auth.currentUser?.providerData.map(
+          (provider) => provider.providerId,
+        ) ??
+        const Iterable<String>.empty();
+    if (ids.contains('google.com')) {
+      return 'Google';
+    }
+    if (ids.contains('apple.com')) {
+      return 'Apple';
+    }
+    if (ids.isEmpty) {
+      return null;
+    }
+    return 'your sign-in provider';
+  }
 
   Future<void> signIn({required String email, required String password}) {
     return guardFirebase(
@@ -199,6 +233,63 @@ class AuthRepository {
     });
   }
 
+  /// Asks Firebase to confirm [email] before it replaces the sign-in address.
+  ///
+  /// The profile document is updated later, once [userChanges] reports the
+  /// confirmed address, via [syncEmailFromAuth].
+  Future<void> requestEmailUpdate(String email, {String? currentPassword}) {
+    return guardFirebase(() async {
+      final user = _requireUser();
+      final password = currentPassword?.trim();
+      if (password != null && password.isNotEmpty) {
+        await _reauthenticate(user, password);
+      }
+      await user.verifyBeforeUpdateEmail(email.trim());
+    });
+  }
+
+  /// Replaces the password after checking [currentPassword].
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) {
+    return guardFirebase(() async {
+      final user = _requireUser();
+      await _reauthenticate(user, currentPassword);
+      await user.updatePassword(newPassword);
+    });
+  }
+
+  /// Writes the auth user's email onto the profile when they have diverged.
+  ///
+  /// Best effort: a failure leaves the stored email as it was.
+  Future<void> syncEmailFromAuth() async {
+    try {
+      await guardFirebase(() async {
+        final user = _auth.currentUser;
+        final email = user?.email?.trim();
+        if (user == null || email == null || email.isEmpty) {
+          return;
+        }
+        final snapshot = await _profileRef(user.uid).get();
+        if (!snapshot.exists) {
+          return;
+        }
+        final stored = FirestoreValue.text(snapshot.data()?['email']);
+        if (stored == email) {
+          return;
+        }
+        await _profileRef(user.uid).set({
+          'email': email,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'schemaVersion': kSchemaVersion,
+        }, SetOptions(merge: true));
+      });
+    } on Object {
+      // The profile keeps the last email it stored.
+    }
+  }
+
   Future<void> sendPasswordReset(String email) {
     return guardFirebase(
       () => _auth.sendPasswordResetEmail(email: email.trim()),
@@ -206,6 +297,59 @@ class AuthRepository {
   }
 
   Future<void> signOut() => guardFirebase(() => _auth.signOut());
+
+  /// Removes the sign-in account after an optional password check.
+  ///
+  /// The profile document is removed while the session can still write it.
+  /// Plant and reminder documents stay under this id; Firestore does not
+  /// delete them with the parent.
+  Future<void> deleteAccount({String? currentPassword}) {
+    return guardFirebase(() async {
+      final user = _requireUser();
+      final password = currentPassword?.trim();
+      if (password != null && password.isNotEmpty) {
+        await _reauthenticate(user, password);
+      } else if (!_signedInRecently(user)) {
+        throw const RecentLoginRequiredException();
+      }
+      final profile = _profileRef(user.uid);
+      await profile.collection('settings').doc('private').delete();
+      await profile.delete();
+      await user.delete();
+    });
+  }
+
+  /// Firebase refuses account deletion after a few minutes without a fresh
+  /// sign-in. Checking first avoids deleting the profile and then failing.
+  bool _signedInRecently(User user) {
+    final lastSignIn = user.metadata.lastSignInTime;
+    if (lastSignIn == null) {
+      return false;
+    }
+    return DateTime.now().difference(lastSignIn) < const Duration(minutes: 4);
+  }
+
+  User _requireUser() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw const UnauthenticatedException();
+    }
+    return user;
+  }
+
+  Future<void> _reauthenticate(User user, String password) async {
+    final email = user.email?.trim();
+    if (email == null || email.isEmpty) {
+      throw const MalformedDataException(
+        'Add an email address before changing your password.',
+      );
+    }
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: password,
+    );
+    await user.reauthenticateWithCredential(credential);
+  }
 
   DocumentReference<Map<String, dynamic>> _profileRef(String uid) =>
       _firestore.collection('users').doc(uid);
@@ -222,7 +366,16 @@ final authRepositoryProvider = Provider<AuthRepository>(
 final userProfileProvider = StreamProvider<AppUser?>((ref) {
   // Re-subscribe when identity changes, so the stream never outlives a session.
   ref.watch(authStateProvider);
-  return ref.watch(authRepositoryProvider).watchProfile();
+  final repository = ref.watch(authRepositoryProvider);
+  // A confirmed email change arrives on the auth user, not the profile stream.
+  final subscription = repository.userChanges().listen((user) {
+    if (user == null) {
+      return;
+    }
+    unawaited(repository.syncEmailFromAuth());
+  });
+  ref.onDispose(subscription.cancel);
+  return repository.watchProfile();
 });
 
 /// Whether there is a session, with [unknown] for "we do not know yet".

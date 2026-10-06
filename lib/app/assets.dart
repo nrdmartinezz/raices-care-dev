@@ -77,6 +77,19 @@ abstract final class AppIcons {
   static const journalChevron = 'assets/icons/journal_chevron.svg';
   static const ctaPlus = 'assets/icons/cta_plus.svg';
 
+  static const accountBell = 'assets/icons/account_bell.svg';
+  static const accountBellUnread = 'assets/icons/account_bell_unread.svg';
+  static const accountSignOutBadge = 'assets/icons/account_sign_out_badge.svg';
+  static const accountAlert = 'assets/icons/account_alert.svg';
+  static const accountPencil = 'assets/icons/account_pencil.svg';
+  static const accountUser = 'assets/icons/account_user.svg';
+  static const accountMail = 'assets/icons/account_mail.svg';
+  static const accountPhone = 'assets/icons/account_phone.svg';
+  static const accountSettings = 'assets/icons/account_settings.svg';
+  static const accountChevron = 'assets/icons/account_chevron.svg';
+  static const accountLock = 'assets/icons/account_lock.svg';
+  static const accountEyeOff = 'assets/icons/account_eye_off.svg';
+
   static const authBadge = 'assets/icons/auth_badge.svg';
   static const fieldEmail = 'assets/icons/field_email.svg';
   static const fieldPassword = 'assets/icons/field_password.svg';

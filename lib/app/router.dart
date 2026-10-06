@@ -12,6 +12,8 @@ import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/plants/presentation/add_plant_screen.dart';
 import '../features/plants/presentation/my_plants_screen.dart';
 import '../features/plants/presentation/plant_detail_screen.dart';
+import '../features/profile/presentation/account_settings_screen.dart';
+import '../features/profile/presentation/profile_screen.dart';
 import '../features/wisdom/presentation/species_article_screen.dart';
 import '../features/wisdom/presentation/wisdom_screen.dart';
 import 'shell/app_shell.dart';
@@ -73,14 +75,31 @@ abstract final class OnboardingRoute {
   static const path = '/onboarding';
 }
 
+abstract final class ProfileRoute {
+  static const name = 'profile';
+  static const path = '/profile';
+}
+
+abstract final class AccountSettingsRoute {
+  static const name = 'accountSettings';
+  static const path = 'settings';
+}
+
+/// Profile and account settings sit beside the tabs, so opening them does not
+/// change which tab is highlighted.
+bool isAccountRoute(String? name) =>
+    name == ProfileRoute.name || name == AccountSettingsRoute.name;
+
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
 /// Application routes.
 ///
 /// The four tabs are branches of a [StatefulShellRoute], so each keeps its own
-/// navigation stack and scroll position while you move between them. Add-plant
-/// is deliberately outside the shell: it renders over the nav instead of
-/// beside it.
+/// navigation stack and scroll position while you move between them. Profile
+/// and settings are siblings of that shell, so they keep the nav without
+/// changing the highlighted tab. Add-plant is deliberately outside the shell:
+/// it renders over the nav instead of beside it.
 ///
 /// Auth and onboarding are gated here rather than in each screen, so no
 /// screen has to check for a session or a finished profile before it renders.
@@ -139,74 +158,100 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) =>
             const AuthScreen(initialMode: AuthMode.signUp),
       ),
-      StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) =>
-            AppShell(navigationShell: navigationShell),
-        // Branch order must match AppTab, which the nav indexes into.
-        branches: [
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: HomeRoute.path,
-                name: HomeRoute.name,
-                builder: (context, state) => const HomeScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: MyPlantsRoute.path,
-                name: MyPlantsRoute.name,
-                builder: (context, state) => const MyPlantsScreen(),
+      ShellRoute(
+        navigatorKey: _shellNavigatorKey,
+        builder: (context, state, child) => AppShell(child: child),
+        routes: [
+          StatefulShellRoute.indexedStack(
+            builder: (context, state, navigationShell) =>
+                PublishNavigationShell(navigationShell: navigationShell),
+            // Branch order must match AppTab, which the nav indexes into.
+            branches: [
+              StatefulShellBranch(
                 routes: [
                   GoRoute(
-                    path: PlantDetailRoute.path,
-                    name: PlantDetailRoute.name,
-                    pageBuilder: (context, state) => _slidePage(
-                      key: state.pageKey,
-                      from: _SlideFrom.end,
-                      child: PlantDetailScreen(
-                        plantId: state.pathParameters['plantId']!,
-                        // Set by the add-plant flow, so the profile can open
-                        // with its "added" banner and not show it again later.
-                        isNew: state.uri.queryParameters['new'] == '1',
+                    path: HomeRoute.path,
+                    name: HomeRoute.name,
+                    builder: (context, state) => const HomeScreen(),
+                  ),
+                ],
+              ),
+              StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                    path: MyPlantsRoute.path,
+                    name: MyPlantsRoute.name,
+                    builder: (context, state) => const MyPlantsScreen(),
+                    routes: [
+                      GoRoute(
+                        path: PlantDetailRoute.path,
+                        name: PlantDetailRoute.name,
+                        pageBuilder: (context, state) => _slidePage(
+                          key: state.pageKey,
+                          from: _SlideFrom.end,
+                          child: PlantDetailScreen(
+                            plantId: state.pathParameters['plantId']!,
+                            // Set by the add-plant flow, so the profile can open
+                            // with its "added" banner and not show it again later.
+                            isNew: state.uri.queryParameters['new'] == '1',
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                ],
+              ),
+              StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                    path: ChoresRoute.path,
+                    name: ChoresRoute.name,
+                    builder: (context, state) => const ChoresScreen(),
+                  ),
+                ],
+              ),
+              StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                    path: WisdomRoute.path,
+                    name: WisdomRoute.name,
+                    builder: (context, state) => const WisdomScreen(),
+                    routes: [
+                      GoRoute(
+                        path: SpeciesArticleRoute.path,
+                        name: SpeciesArticleRoute.name,
+                        pageBuilder: (context, state) => _slidePage(
+                          key: state.pageKey,
+                          from: _SlideFrom.end,
+                          child: SpeciesArticleScreen(
+                            speciesId: state.pathParameters['speciesId']!,
+                            trefleSlug: state.uri.queryParameters['slug'],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
-          StatefulShellBranch(
+          GoRoute(
+            path: ProfileRoute.path,
+            name: ProfileRoute.name,
+            pageBuilder: (context, state) => _slidePage(
+              key: state.pageKey,
+              from: _SlideFrom.end,
+              child: const ProfileScreen(),
+            ),
             routes: [
               GoRoute(
-                path: ChoresRoute.path,
-                name: ChoresRoute.name,
-                builder: (context, state) => const ChoresScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: WisdomRoute.path,
-                name: WisdomRoute.name,
-                builder: (context, state) => const WisdomScreen(),
-                routes: [
-                  GoRoute(
-                    path: SpeciesArticleRoute.path,
-                    name: SpeciesArticleRoute.name,
-                    pageBuilder: (context, state) => _slidePage(
-                      key: state.pageKey,
-                      from: _SlideFrom.end,
-                      child: SpeciesArticleScreen(
-                        speciesId: state.pathParameters['speciesId']!,
-                        trefleSlug: state.uri.queryParameters['slug'],
-                      ),
-                    ),
-                  ),
-                ],
+                path: AccountSettingsRoute.path,
+                name: AccountSettingsRoute.name,
+                pageBuilder: (context, state) => _slidePage(
+                  key: state.pageKey,
+                  from: _SlideFrom.end,
+                  child: const AccountSettingsScreen(),
+                ),
               ),
             ],
           ),
@@ -252,11 +297,10 @@ CustomTransitionPage<void> _slidePage({
       );
       final begin = switch (from) {
         _SlideFrom.bottom => const Offset(0, 1),
-        _SlideFrom.end =>
-          Offset(
-            Directionality.of(context) == TextDirection.rtl ? -1 : 1,
-            0,
-          ),
+        _SlideFrom.end => Offset(
+          Directionality.of(context) == TextDirection.rtl ? -1 : 1,
+          0,
+        ),
       };
       return SlideTransition(
         position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),

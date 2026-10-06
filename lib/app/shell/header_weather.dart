@@ -12,7 +12,9 @@ import '../theme.dart';
 /// Temperature, place, and humidity only. The sun icon and the card stay on
 /// the home strip.
 class HeaderWeather extends ConsumerWidget {
-  const HeaderWeather({super.key});
+  const HeaderWeather({super.key, this.textAlign = TextAlign.start});
+
+  final TextAlign textAlign;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -26,6 +28,7 @@ class HeaderWeather extends ConsumerWidget {
         _line(reading, unit),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+        textAlign: textAlign,
       ),
       orElse: () => const SizedBox.shrink(),
     );

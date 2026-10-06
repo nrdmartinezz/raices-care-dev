@@ -18,12 +18,16 @@ class FlowHeader extends StatelessWidget {
     required this.eyebrow,
     required this.title,
     this.onBack,
+    this.action = const HeaderWeather(),
   });
 
   /// The small green line above the title: `STEP 1 OF 3`, `MY PLANTS`.
   final String eyebrow;
   final String title;
   final VoidCallback? onBack;
+
+  /// Sits at the trailing edge. The plant and species bars keep the weather.
+  final Widget action;
 
   @override
   Widget build(BuildContext context) {
@@ -74,10 +78,10 @@ class FlowHeader extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const Flexible(
+                      Flexible(
                         child: Align(
                           alignment: Alignment.centerRight,
-                          child: HeaderWeather(),
+                          child: action,
                         ),
                       ),
                     ],
@@ -133,11 +137,7 @@ class _Glyph extends StatelessWidget {
 
 /// The segmented bar under the header on a multi-step flow.
 class FlowProgress extends StatelessWidget {
-  const FlowProgress({
-    super.key,
-    required this.step,
-    required this.stepCount,
-  });
+  const FlowProgress({super.key, required this.step, required this.stepCount});
 
   /// One-based, so `step: 2` fills the first two segments.
   final int step;

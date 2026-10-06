@@ -4,10 +4,85 @@ import 'package:go_router/go_router.dart';
 
 import '../router.dart';
 import '../theme.dart';
-import 'account_sheet.dart';
 import 'app_bottom_nav.dart';
 import 'app_header.dart';
 import 'flow_header.dart';
+import 'header_bell.dart';
+
+/// The tab shell, remembered so account routes beside the branches can still
+/// highlight a tab and switch to it.
+class ShellTab {
+  const ShellTab({required this.shell, required this.index});
+
+  final StatefulNavigationShell shell;
+  final int index;
+}
+
+class ShellTabHandle extends Notifier<ShellTab?> {
+  @override
+  ShellTab? build() => null;
+
+  void publish(StatefulNavigationShell shell) {
+    if (state?.shell == shell && state?.index == shell.currentIndex) {
+      return;
+    }
+    state = ShellTab(shell: shell, index: shell.currentIndex);
+  }
+}
+
+final shellTabProvider = NotifierProvider<ShellTabHandle, ShellTab?>(
+  ShellTabHandle.new,
+);
+
+/// Publishes the tab shell from inside the branch navigator.
+///
+/// The index lives on the shell object and changes in place, so this widget
+/// remembers the last index it sent and publishes again when that changes.
+class PublishNavigationShell extends ConsumerStatefulWidget {
+  const PublishNavigationShell({super.key, required this.navigationShell});
+
+  final StatefulNavigationShell navigationShell;
+
+  @override
+  ConsumerState<PublishNavigationShell> createState() =>
+      _PublishNavigationShellState();
+}
+
+class _PublishNavigationShellState
+    extends ConsumerState<PublishNavigationShell> {
+  StatefulNavigationShell? _published;
+  int? _publishedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _schedulePublish();
+  }
+
+  @override
+  void didUpdateWidget(PublishNavigationShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _schedulePublish();
+  }
+
+  void _schedulePublish() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final shell = widget.navigationShell;
+      if (_published == shell && _publishedIndex == shell.currentIndex) {
+        return;
+      }
+      _published = shell;
+      _publishedIndex = shell.currentIndex;
+      ref.read(shellTabProvider.notifier).publish(shell);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.navigationShell;
+}
 
 /// Frame shared by every tab: the frosted header above, the nav below, and
 /// the active branch between them.
@@ -17,40 +92,30 @@ import 'flow_header.dart';
 /// pad itself clear of both — use [ShellScrollView] rather than doing it by
 /// hand.
 class AppShell extends ConsumerWidget {
-  const AppShell({super.key, required this.navigationShell});
+  const AppShell({super.key, required this.child});
 
-  final StatefulNavigationShell navigationShell;
+  /// The shell navigator: the active tab, or an account page pushed over it.
+  final Widget child;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tab = ref.watch(shellTabProvider);
+    final index = tab?.index ?? 0;
     return Scaffold(
       backgroundColor: AppColors.canvas,
       body: Stack(
         children: [
           Positioned.fill(
-            child: _BranchFade(
-              index: navigationShell.currentIndex,
-              child: navigationShell,
-            ),
+            child: _BranchFade(index: index, child: child),
           ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _header(context, ref),
-          ),
+          Positioned(top: 0, left: 0, right: 0, child: _header(context)),
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
             child: AppBottomNav(
-              currentIndex: navigationShell.currentIndex,
-              onSelect: (index) => navigationShell.goBranch(
-                index,
-                // Tapping the tab you are already on returns to its root,
-                // the usual way to escape a stack you have pushed into.
-                initialLocation: index == navigationShell.currentIndex,
-              ),
+              currentIndex: index,
+              onSelect: (selected) => _selectTab(context, ref, selected),
               onAdd: () => context.pushNamed(AddPlantRoute.name),
             ),
           ),
@@ -59,12 +124,54 @@ class AppShell extends ConsumerWidget {
     );
   }
 
+  void _selectTab(BuildContext context, WidgetRef ref, int index) {
+    final tab = ref.read(shellTabProvider);
+    if (tab == null) {
+      return;
+    }
+    final onAccount = isAccountRoute(GoRouterState.of(context).topRoute?.name);
+    if (onAccount) {
+      // Leave the account pages for the tab that was tapped. `go` drops the
+      // profile stack; the branch underneath keeps the tab the gardener was on
+      // until this choice.
+      context.go(_tabPath(index));
+      return;
+    }
+    tab.shell.goBranch(
+      index,
+      // Tapping the tab you are already on returns to its root,
+      // the usual way to escape a stack you have pushed into.
+      initialLocation: index == tab.index,
+    );
+  }
+
+  String _tabPath(int index) => switch (index) {
+    0 => HomeRoute.path,
+    1 => MyPlantsRoute.path,
+    2 => ChoresRoute.path,
+    _ => WisdomRoute.path,
+  };
+
   /// The bar at the top of the frame.
   ///
-  /// Home keeps the logo bar. The other tab roots swap it for a weather line.
+  /// Home keeps the logo bar. The other tab roots keep the logo and center
+  /// a weather line.
   /// A pushed screen keeps the nav, and gets [FlowHeader] for a way back.
-  Widget _header(BuildContext context, WidgetRef ref) {
+  Widget _header(BuildContext context) {
     final routeName = GoRouterState.of(context).topRoute?.name;
+    if (routeName == ProfileRoute.name) {
+      return const AppHeader(showBell: true);
+    }
+    if (routeName == AccountSettingsRoute.name) {
+      return FlowHeader(
+        eyebrow: 'YOUR ACCOUNT',
+        title: 'Settings',
+        onBack: () => context.canPop()
+            ? context.pop()
+            : context.goNamed(ProfileRoute.name),
+        action: const HeaderBell(showUnread: true),
+      );
+    }
     if (routeName == PlantDetailRoute.name) {
       return FlowHeader(
         eyebrow: 'MY PLANTS',
@@ -85,7 +192,7 @@ class AppShell extends ConsumerWidget {
     }
     return AppHeader(
       showWeather: routeName != HomeRoute.name,
-      onProfile: () => showAccountSheet(context, ref),
+      onProfile: () => context.pushNamed(ProfileRoute.name),
     );
   }
 }

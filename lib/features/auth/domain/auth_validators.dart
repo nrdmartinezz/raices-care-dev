@@ -35,6 +35,21 @@ String? validatePassword(String? value, {required bool isNewAccount}) {
   return null;
 }
 
+String? validatePhone(String? value) {
+  final phone = value?.trim() ?? '';
+  if (phone.isEmpty) {
+    return 'Enter your phone number.';
+  }
+  if (phone.length > 32) {
+    return 'That does not look like a phone number.';
+  }
+  final digits = phone.replaceAll(RegExp(r'\D'), '');
+  if (digits.length < 7 || digits.length > 15) {
+    return 'That does not look like a phone number.';
+  }
+  return null;
+}
+
 String? validateDisplayName(String? value) {
   final name = value?.trim() ?? '';
   if (name.isEmpty) {

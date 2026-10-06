@@ -16,6 +16,15 @@ sealed class AppException implements Exception {
   String toString() => '$runtimeType: $message';
 }
 
+/// The account change needs a fresh sign-in, usually the current password.
+class RecentLoginRequiredException extends AppException {
+  const RecentLoginRequiredException([
+    super.message = 'Enter your current password to confirm this change.',
+    Object? cause,
+    StackTrace? stackTrace,
+  ]) : super(cause: cause, stackTrace: stackTrace);
+}
+
 /// Not signed in, or the session expired.
 class UnauthenticatedException extends AppException {
   const UnauthenticatedException([
@@ -150,6 +159,13 @@ AppException mapFirebaseException(Object error, StackTrace stackTrace) {
       'user-cancelled' => const SignInCancelledException(),
       'network-request-failed' => const NetworkException(),
       'too-many-requests' => const RateLimitedException(),
+      'requires-recent-login' => const RecentLoginRequiredException(),
+      'weak-password' => const MalformedDataException(
+        'Use at least 8 characters.',
+      ),
+      'invalid-email' => const MalformedDataException(
+        'That does not look like an email address.',
+      ),
       _ => UnauthenticatedException(
         error.message ?? 'Could not sign you in.',
         error,

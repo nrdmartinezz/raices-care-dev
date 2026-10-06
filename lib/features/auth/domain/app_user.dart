@@ -191,6 +191,7 @@ class AppUser {
     required this.id,
     this.displayName,
     this.email,
+    this.phoneNumber,
     this.homeLocation = const HomeLocation(),
     this.units = const MeasurementPreferences(),
     this.notificationPreferences = const NotificationPreferences(),
@@ -204,6 +205,9 @@ class AppUser {
   final String id;
   final String? displayName;
   final String? email;
+
+  /// A contact number. It is not a sign-in method.
+  final String? phoneNumber;
   final HomeLocation homeLocation;
   final MeasurementPreferences units;
   final NotificationPreferences notificationPreferences;
@@ -229,6 +233,7 @@ class AppUser {
       id: snapshot.id,
       displayName: FirestoreValue.text(data['displayName']),
       email: FirestoreValue.text(data['email']),
+      phoneNumber: FirestoreValue.text(data['phoneNumber']),
       homeLocation: HomeLocation.fromMap(
         FirestoreValue.map(data['homeLocation']),
       ),
@@ -253,6 +258,7 @@ class AppUser {
   Map<String, Object?> toCreateJson() => {
     'displayName': displayName,
     'email': email,
+    'phoneNumber': phoneNumber,
     'homeLocation': homeLocation.toMap(),
     'units': units.toMap(),
     'notificationPreferences': notificationPreferences.toMap(),
@@ -265,6 +271,7 @@ class AppUser {
       withoutNulls({
         'displayName': displayName,
         'email': email,
+        'phoneNumber': phoneNumber,
         'homeLocation': homeLocation.toMap(),
         'units': units.toMap(),
         'notificationPreferences': notificationPreferences.toMap(),
@@ -278,6 +285,7 @@ class AppUser {
   AppUser copyWith({
     String? displayName,
     String? email,
+    String? phoneNumber,
     HomeLocation? homeLocation,
     MeasurementPreferences? units,
     NotificationPreferences? notificationPreferences,
@@ -288,6 +296,7 @@ class AppUser {
       id: id,
       displayName: displayName ?? this.displayName,
       email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       homeLocation: homeLocation ?? this.homeLocation,
       units: units ?? this.units,
       notificationPreferences:
