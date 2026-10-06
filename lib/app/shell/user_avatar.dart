@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_providers.dart';
+import '../../core/api/authenticated_image.dart';
 import '../../features/onboarding/data/avatar_repository.dart';
 import '../assets.dart';
 
@@ -25,6 +27,17 @@ class UserAvatar extends ConsumerWidget {
     }
 
     final url = ref.watch(avatarUrlProvider(stored));
+    if (url == workerAvatarPath) {
+      return ClipOval(
+        child: Image(
+          image: AuthenticatedImage(ref.watch(apiClientProvider), '/v1/me/avatar'),
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => placeholder,
+        ),
+      );
+    }
     return ClipOval(
       child: Image.network(
         url,

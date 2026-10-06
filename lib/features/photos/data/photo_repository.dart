@@ -4,6 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_config.dart';
+import '../../../core/api/api_providers.dart';
+import '../../../core/api/worker_repositories.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../domain/garden_image_url.dart';
@@ -128,11 +131,22 @@ class PhotoRepository {
   }
 }
 
-final photoRepositoryProvider = Provider<PhotoRepository>(
-  (ref) => PhotoRepository(
-    firestore: ref.watch(firestoreProvider),
-    functions: ref.watch(firebaseFunctionsProvider),
-    userId: ref.watch(currentUserIdProvider),
+final photoRepositoryProvider = Provider<PhotoRepository>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  final firestore = ref.watch(firestoreProvider);
+  final functions = ref.watch(firebaseFunctionsProvider);
+  if (usesWorkerApi) {
+    return WorkerPhotoRepository(
+      firestore: firestore,
+      functions: functions,
+      userId: userId,
+      backend: ref.watch(workerBackendProvider),
+    );
+  }
+  return PhotoRepository(
+    firestore: firestore,
+    functions: functions,
+    userId: userId,
     onUploaded: (path) => ref.read(imageRevisionProvider.notifier).bump(path),
-  ),
-);
+  );
+});

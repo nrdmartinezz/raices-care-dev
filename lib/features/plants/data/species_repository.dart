@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_config.dart';
+import '../../../core/api/api_providers.dart';
+import '../../../core/api/worker_repositories.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../domain/care_profile.dart';
@@ -147,12 +150,18 @@ class SpeciesRepository {
       _firestore.collection('species').doc(speciesId);
 }
 
-final speciesRepositoryProvider = Provider<SpeciesRepository>(
-  (ref) => SpeciesRepository(
-    firestore: ref.watch(firestoreProvider),
-    functions: ref.watch(firebaseFunctionsProvider),
-  ),
-);
+final speciesRepositoryProvider = Provider<SpeciesRepository>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  final functions = ref.watch(firebaseFunctionsProvider);
+  if (usesWorkerApi) {
+    return WorkerSpeciesRepository(
+      firestore: firestore,
+      functions: functions,
+      backend: ref.watch(workerBackendProvider),
+    );
+  }
+  return SpeciesRepository(firestore: firestore, functions: functions);
+});
 
 /// Watched, not fetched: `resolveSpecies` may still be filling the record in
 /// when a plant's profile first opens.

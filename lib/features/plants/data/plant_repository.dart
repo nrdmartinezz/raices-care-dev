@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/api/api_config.dart';
+import '../../../core/api/api_providers.dart';
+import '../../../core/api/worker_repositories.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../domain/plant.dart';
@@ -114,12 +117,18 @@ class PlantRepository {
   }
 }
 
-final plantRepositoryProvider = Provider<PlantRepository>(
-  (ref) => PlantRepository(
-    firestore: ref.watch(firestoreProvider),
-    userId: ref.watch(currentUserIdProvider),
-  ),
-);
+final plantRepositoryProvider = Provider<PlantRepository>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  final firestore = ref.watch(firestoreProvider);
+  if (usesWorkerApi) {
+    return WorkerPlantRepository(
+      firestore: firestore,
+      userId: userId,
+      backend: ref.watch(workerBackendProvider),
+    );
+  }
+  return PlantRepository(firestore: firestore, userId: userId);
+});
 
 final activePlantsProvider = StreamProvider<List<Plant>>((ref) {
   if (ref.watch(currentUserIdProvider) == null) {

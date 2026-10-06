@@ -3,6 +3,10 @@ import 'dart:typed_data';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_config.dart';
+import '../../../core/api/api_providers.dart';
+import '../../../core/api/authenticated_image.dart';
+import '../../../core/api/worker_repositories.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../../photos/data/image_revision.dart';
@@ -51,19 +55,31 @@ class AvatarRepository {
   }
 }
 
-final avatarRepositoryProvider = Provider<AvatarRepository>(
-  (ref) => AvatarRepository(
-    functions: ref.watch(firebaseFunctionsProvider),
-    userId: ref.watch(currentUserIdProvider),
+final avatarRepositoryProvider = Provider<AvatarRepository>((ref) {
+  final functions = ref.watch(firebaseFunctionsProvider);
+  final userId = ref.watch(currentUserIdProvider);
+  if (usesWorkerApi) {
+    return WorkerAvatarRepository(
+      functions: functions,
+      userId: userId,
+      backend: ref.watch(workerBackendProvider),
+    );
+  }
+  return AvatarRepository(
+    functions: functions,
+    userId: userId,
     onUploaded: (path) => ref.read(imageRevisionProvider.notifier).bump(path),
-  ),
-);
+  );
+});
 
 /// The custom-domain URL for a stored avatar path.
 ///
 /// A version query is included after this session replaces the file, so the
 /// circle does not keep the previous JPEG.
 final avatarUrlProvider = Provider.family<String, String>((ref, path) {
+  if (usesWorkerApi || path == workerAvatarPath) {
+    return workerAvatarPath;
+  }
   final version = ref.watch(imageRevisionProvider)[path];
   return gardenImageUrl(path, version: version);
 });

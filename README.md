@@ -102,6 +102,25 @@ file generation step.
 
 While an app is running, `r` hot-reloads, `R` hot-restarts, and `q` quits.
 
+### API base URL
+
+The app talks to Firestore until `API_BASE_URL` is set. That define is the Worker origin, with no path.
+
+| Where the app runs | URL |
+| --- | --- |
+| This machine, including Chrome | `http://localhost:8787` |
+| Android emulator | `http://10.0.2.2:8787` |
+| A release build | `https://api.raices.care` |
+
+`10.0.2.2` is the emulator's name for the computer running `wrangler dev`. Release builds refuse `localhost`, `127.0.0.1`, and `10.0.2.2`. `api.raices.care` is the hostname to attach later. It is not routed yet.
+
+```powershell
+C:\flutter\bin\flutter.bat run -d chrome --dart-define=API_BASE_URL=http://localhost:8787
+C:\flutter\bin\flutter.bat run -d emulator-5554 --dart-define=API_BASE_URL=http://10.0.2.2:8787
+```
+
+Leave the define off to keep using Firestore. Start the Worker first with the commands under [Cloudflare API](#cloudflare-api).
+
 ## Creating a new Android emulator
 
 If `flutter emulators` lists nothing, install a 64-bit system image and create a device:
@@ -285,6 +304,25 @@ cd functions; npm run seed
 ```
 
 Set the token for a single shell only. Do not put it in a file.
+
+## Cloudflare API
+
+`backend/` is a Worker (Hono) in front of the existing D1 database `raices-care-sql` and the private R2 bucket `raices-care-images`. Firebase Auth stays. Firestore and the Cloud Functions stay in the app until a signed-in create, care log, and photo round-trip succeed against local `wrangler dev`.
+
+Nothing in this directory is deployed from here. Do not run `wrangler deploy` or a remote D1 migration. Secrets go in `backend/.dev.vars` (gitignored) or `wrangler secret put`. FCM stays a dry run until `FCM_SERVICE_ACCOUNT_JSON` is set and `DRY_RUN_PUSH` is `"false"`.
+
+```powershell
+cd backend
+npm install
+npx wrangler d1 migrations apply raices-care-sql --local
+npm run db:seed
+npm test
+npx wrangler dev
+```
+
+`wrangler dev` listens on `http://localhost:8787`. Pass that origin as `API_BASE_URL`. The Android emulator uses `http://10.0.2.2:8787` instead, and a release build must use `https://api.raices.care`. The full table is under [API base URL](#api-base-url).
+
+Profile and plant photos are private: the Worker checks the token and streams the bytes. `cloud-r2.raices.care` remains only for plants saved before that switch.
 
 ## Deploying
 

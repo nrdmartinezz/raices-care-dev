@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_config.dart';
+import '../../../core/api/api_providers.dart';
+import '../../../core/api/worker_repositories.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../domain/care_event.dart';
@@ -74,9 +77,15 @@ class CareEventRepository {
   }
 }
 
-final careEventRepositoryProvider = Provider<CareEventRepository>(
-  (ref) => CareEventRepository(
-    firestore: ref.watch(firestoreProvider),
-    userId: ref.watch(currentUserIdProvider),
-  ),
-);
+final careEventRepositoryProvider = Provider<CareEventRepository>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  final firestore = ref.watch(firestoreProvider);
+  if (usesWorkerApi) {
+    return WorkerCareEventRepository(
+      firestore: firestore,
+      userId: userId,
+      backend: ref.watch(workerBackendProvider),
+    );
+  }
+  return CareEventRepository(firestore: firestore, userId: userId);
+});

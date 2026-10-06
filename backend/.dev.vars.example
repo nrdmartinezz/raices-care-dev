@@ -1,0 +1,6 @@
+# Copy to .dev.vars for `wrangler dev`. .dev.vars is gitignored.
+# Do not put real secrets in this example.
+#
+# FCM stays a dry run until this is set with `wrangler secret put` and
+# DRY_RUN_PUSH is changed to "false".
+# FCM_SERVICE_ACCOUNT_JSON=

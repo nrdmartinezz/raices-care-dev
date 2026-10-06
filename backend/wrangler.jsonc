@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Local Worker only. No route is attached, so this does not publish to
+  // api.raices.care. Deploy with `wrangler deploy` when that is intentional.
+  "name": "raices-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "6cd4a37d293aa36c028b11945b8c74e1",
+  "workers_dev": false,
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+  "vars": {
+    "FIREBASE_PROJECT_ID": "raices-care",
+    "ENVIRONMENT": "development",
+    "DRY_RUN_PUSH": "true",
+    "APP_CHECK_ENFORCE": "false",
+    "ALLOWED_ORIGINS": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "raices-care-sql",
+      "database_id": "c21edfd8-5757-4778-a76d-66638dc18851",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "raices-care-images"
+    }
+  ]
+}

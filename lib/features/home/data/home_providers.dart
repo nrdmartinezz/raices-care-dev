@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_providers.dart';
+import '../../../core/api/authenticated_image.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../care/data/reminder_repository.dart';
@@ -169,14 +171,16 @@ final activePlantCountProvider = Provider<int>(
   (ref) => ref.watch(activePlantsProvider).value?.length ?? 0,
 );
 
-/// Resolves a cover photo's object key to an image on the custom domain.
-///
-/// Only the path is stored. A version query is added when this session
-/// replaced the file, so the card shows the new JPEG.
+/// Resolves a cover photo. Worker photos are streamed with the ID token.
+/// Public R2 URLs remain for plants saved before that switch.
 final plantCoverImageProvider = Provider.family<ImageProvider, String>((
   ref,
   storagePath,
 ) {
+  if (storagePath.startsWith(workerPhotoPrefix)) {
+    final id = storagePath.substring(workerPhotoPrefix.length);
+    return AuthenticatedImage(ref.watch(apiClientProvider), '/v1/photos/$id');
+  }
   final version = ref.watch(imageRevisionProvider)[storagePath];
   return NetworkImage(gardenImageUrl(storagePath, version: version));
 });

@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_config.dart';
+import '../../../core/api/api_providers.dart';
+import '../../../core/api/worker_repositories.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../../../core/utils/firestore_values.dart';
@@ -112,10 +115,21 @@ class UserSettingsRepository {
       .doc('private');
 }
 
-final userSettingsRepositoryProvider = Provider<UserSettingsRepository>(
-  (ref) => UserSettingsRepository(
-    firestore: ref.watch(firestoreProvider),
-    messaging: ref.watch(firebaseMessagingProvider),
-    userId: ref.watch(currentUserIdProvider),
-  ),
-);
+final userSettingsRepositoryProvider = Provider<UserSettingsRepository>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  final messaging = ref.watch(firebaseMessagingProvider);
+  final userId = ref.watch(currentUserIdProvider);
+  if (usesWorkerApi) {
+    return WorkerUserSettingsRepository(
+      firestore: firestore,
+      messaging: messaging,
+      userId: userId,
+      backend: ref.watch(workerBackendProvider),
+    );
+  }
+  return UserSettingsRepository(
+    firestore: firestore,
+    messaging: messaging,
+    userId: userId,
+  );
+});

@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_config.dart';
+import '../../../core/api/api_providers.dart';
+import '../../../core/api/worker_repositories.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../../../core/utils/firestore_values.dart';
@@ -133,12 +136,18 @@ class ReminderRepository {
   }
 }
 
-final reminderRepositoryProvider = Provider<ReminderRepository>(
-  (ref) => ReminderRepository(
-    firestore: ref.watch(firestoreProvider),
-    userId: ref.watch(currentUserIdProvider),
-  ),
-);
+final reminderRepositoryProvider = Provider<ReminderRepository>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  final firestore = ref.watch(firestoreProvider);
+  if (usesWorkerApi) {
+    return WorkerReminderRepository(
+      firestore: firestore,
+      userId: userId,
+      backend: ref.watch(workerBackendProvider),
+    );
+  }
+  return ReminderRepository(firestore: firestore, userId: userId);
+});
 
 /// Reminders already due, which is what the home screen's ritual list shows.
 final dueRemindersProvider = StreamProvider<List<Reminder>>((ref) {

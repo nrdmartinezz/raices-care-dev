@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_config.dart';
+import '../../../core/api/api_providers.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../../../core/utils/firestore_values.dart';
@@ -12,10 +14,15 @@ import '../domain/app_user.dart';
 
 /// Identity, plus the profile document that mirrors it.
 class AuthRepository {
-  AuthRepository({required this._auth, required this._firestore});
+  AuthRepository({
+    required this._auth,
+    required this._firestore,
+    this._syncAccount,
+  });
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final Future<void> Function({String? displayName, String? email})? _syncAccount;
 
   User? get currentUser => _auth.currentUser;
 
@@ -160,6 +167,8 @@ class AuthRepository {
         throw const UnauthenticatedException();
       }
 
+      await _syncAccount?.call(displayName: user.displayName, email: user.email);
+
       final ref = _profileRef(user.uid);
       if ((await ref.get()).exists) {
         return;
@@ -186,11 +195,10 @@ class AuthRepository {
   }
 
   Future<void> updateProfile(AppUser user) {
-    return guardFirebase(
-      () =>
-          _profileRef(user.id)
-              .set(user.toUpdateJson(), SetOptions(merge: true)),
-    );
+    return guardFirebase(() async {
+      await _syncAccount?.call(displayName: user.displayName, email: user.email);
+      await _profileRef(user.id).set(user.toUpdateJson(), SetOptions(merge: true));
+    });
   }
 
   /// Keeps the auth account's name in step with the profile document.
@@ -359,6 +367,11 @@ final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepository(
     auth: ref.watch(firebaseAuthProvider),
     firestore: ref.watch(firestoreProvider),
+    syncAccount: usesWorkerApi
+        ? ({displayName, email}) => ref
+              .read(workerBackendProvider)
+              .syncProfile(displayName: displayName, email: email)
+        : null,
   ),
 );
 
