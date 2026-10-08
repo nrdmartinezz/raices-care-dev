@@ -220,8 +220,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             const AuthDivider(label: 'OR CONTINUE WITH'),
             SocialSignInRow(
               enabled: !busy,
-              onApple: () =>
-                  ref.read(authControllerProvider.notifier).signInWithApple(),
               onGoogle: () =>
                   ref.read(authControllerProvider.notifier).signInWithGoogle(),
             ),

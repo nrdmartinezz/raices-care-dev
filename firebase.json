@@ -1,4 +1,14 @@
 {
+  "auth": {
+    "authorizedDomains": ["localhost", "raices-care.firebaseapp.com", "raices-care.web.app"],
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Raíces",
+        "supportEmail": "nrd.martinezz@gmail.com"
+      }
+    }
+  },
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"

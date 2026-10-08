@@ -39,42 +39,19 @@ class _Rule extends StatelessWidget {
       const ColoredBox(color: AppColors.surfaceClay, child: SizedBox(height: 1));
 }
 
-/// Apple and Google, side by side.
-///
-/// The design has a third magic-link button; it was dropped, so the two that
-/// remain share the row evenly rather than leaving a gap where it sat.
+/// Google, on its own until Apple sign-in is worth the developer account.
 class SocialSignInRow extends StatelessWidget {
-  const SocialSignInRow({
-    super.key,
-    this.onApple,
-    this.onGoogle,
-    this.enabled = true,
-  });
+  const SocialSignInRow({super.key, this.onGoogle, this.enabled = true});
 
-  final VoidCallback? onApple;
   final VoidCallback? onGoogle;
   final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _SocialButton(
-            icon: AppIcons.socialApple,
-            label: 'Continue with Apple',
-            onTap: enabled ? onApple : null,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _SocialButton(
-            icon: AppIcons.socialGoogle,
-            label: 'Continue with Google',
-            onTap: enabled ? onGoogle : null,
-          ),
-        ),
-      ],
+    return _SocialButton(
+      icon: AppIcons.socialGoogle,
+      label: 'Continue with Google',
+      onTap: enabled ? onGoogle : null,
     );
   }
 }
@@ -104,13 +81,32 @@ class _SocialButton extends StatelessWidget {
             opacity: onTap == null ? 0.5 : 1,
             child: SizedBox(
               height: 48,
-              child: Center(
-                child: SvgPicture.asset(icon, width: 20, height: 20),
-              ),
+              child: Center(child: _SocialMark(icon: icon)),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SocialMark extends StatelessWidget {
+  const _SocialMark({required this.icon});
+
+  final String icon;
+
+  static const _size = 20.0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (icon.endsWith('.svg')) {
+      return SvgPicture.asset(icon, width: _size, height: _size);
+    }
+    return Image.asset(
+      icon,
+      width: _size,
+      height: _size,
+      filterQuality: FilterQuality.medium,
     );
   }
 }

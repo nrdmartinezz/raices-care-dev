@@ -52,10 +52,9 @@ has to.
 
 ### What is left
 
-- **Google and Apple are not configured in the console.** Both buttons are
-  live and will surface "That sign-in method is not set up yet." until the
-  operational tasks in section 4 are done. Apple is mandatory on iOS now that
-  Google is offered.
+- **Apple sign-in is hidden.** The button is off until an Apple Developer
+  account exists. Google is enabled from `firebase.json`. When Apple comes
+  back, iOS will need it beside Google.
 - **`enablePushNotifications()` is never called.** It asks for permission and
   registers the FCM token, and the scheduled reminder function skips any user
   with no tokens — so reminders silently do nothing until it runs. The natural
@@ -126,7 +125,21 @@ These need a person in a console or a terminal, not code.
 
 - [ ] **Rotate the Trefle API token.** The current one was pasted into a chat and is in an uploaded file. Replace it at trefle.io, then set the new one with `firebase functions:secrets:set TREFLE_API_TOKEN`. It must not go in any committed file.
 - [ ] **Enable the Firestore API** on `raices-care`. It is still disabled, so nothing can deploy or be tested against the real project.
-- [ ] **Enable Google and Apple sign-in** in Authentication → Sign-in method. Until then both buttons on the auth screen fail with "That sign-in method is not set up yet." Apple also needs a Service ID and key in the Apple Developer portal.
+- [x] **Google sign-in** is enabled in `firebase.json` (`emailPassword` stays on, and `localhost` is an authorized domain). Deploy with `npx -y firebase-tools@latest deploy --only auth`.
+- [ ] **Enable Apple sign-in** once the developer account exists, then put the button back on the auth screen. `signInWithApple()` is still in the repository. Firebase rejects it until these values are saved in [Authentication → Sign-in method → Apple](https://console.firebase.google.com/project/raices-care/authentication/providers). Never commit the `.p8` key.
+
+  Apple Developer portal:
+
+  1. Identifiers → App IDs: register `care.raices.app` and turn on Sign in with Apple.
+  2. Identifiers → Services IDs: create the web client (for example `care.raices.app.signin`) and turn on Sign in with Apple. Configure it with domain `raices-care.firebaseapp.com` and return URL `https://raices-care.firebaseapp.com/__/auth/handler`.
+  3. Keys: create a Sign in with Apple key, download the `.p8` once, and note the Key ID. The Team ID is on the Membership page.
+
+  Firebase Apple provider fields, in the order the console asks for them:
+
+  - Services ID — the identifier from step 2
+  - Apple Team ID
+  - Key ID
+  - Private key — the contents of the `.p8`
 - [ ] **Delete the old** `com.example.raices` **apps** from the Firebase project. The package is now `care.raices.app`.
 - [ ] **Decide the dev/prod split.** The plan was `raices-dev` and `raices-prod` with a `.dev` applicationId suffix on debug builds. Nothing is configured yet; today there is one project for everything.
 - [ ] **Deploy the backend** once the above is settled: rules, then indexes, then functions. Indexes take minutes to build and queries fail until they finish, so do them before anything that depends on them.

@@ -100,14 +100,16 @@ void main() {
       expect(find.text('Remember me'), findsNothing);
     });
 
-    testWidgets('both modes offer Apple and Google', (tester) async {
+    testWidgets('both modes offer Google and not Apple', (tester) async {
       _usePhoneSurface(tester);
-      await tester.pumpWidget(_authScreen());
-      await tester.pump();
+      for (final mode in AuthMode.values) {
+        await tester.pumpWidget(_authScreen(mode: mode));
+        await tester.pump();
 
-      expect(find.text('OR CONTINUE WITH'), findsOneWidget);
-      expect(find.bySemanticsLabel('Continue with Apple'), findsOneWidget);
-      expect(find.bySemanticsLabel('Continue with Google'), findsOneWidget);
+        expect(find.text('OR CONTINUE WITH'), findsOneWidget);
+        expect(find.bySemanticsLabel('Continue with Apple'), findsNothing);
+        expect(find.bySemanticsLabel('Continue with Google'), findsOneWidget);
+      }
     });
   });
 
