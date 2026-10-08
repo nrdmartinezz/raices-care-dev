@@ -9,7 +9,7 @@
  */
 
 export { onUserCreated } from "./users";
-export { onPlantCreated, onPlantDeleted } from "./plants";
+export { onPlantCreated, onPlantDeleted, addPlantToChores } from "./plants";
 export { onCareEventCreated } from "./care";
 export { generateDueReminderNotifications } from "./reminders";
 export { resolveSpecies, searchSpeciesCatalog } from "./catalog/resolve_species";

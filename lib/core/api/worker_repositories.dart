@@ -75,8 +75,10 @@ class WorkerCareEventRepository extends CareEventRepository {
   }) => backend.watchHistoryOfType(plantId, eventType, limit: limit);
 
   @override
-  Future<void> deleteEvent({required String plantId, required String eventId}) =>
-      backend.deleteEvent(plantId: plantId, eventId: eventId);
+  Future<void> deleteEvent({
+    required String plantId,
+    required String eventId,
+  }) => backend.deleteEvent(plantId: plantId, eventId: eventId);
 }
 
 class WorkerReminderRepository extends ReminderRepository {
@@ -89,17 +91,31 @@ class WorkerReminderRepository extends ReminderRepository {
   final WorkerBackend backend;
 
   @override
-  Stream<List<Reminder>> watchOpen({int limit = 100}) => backend.watchOpen(limit: limit);
+  Stream<List<Reminder>> watchOpen({int limit = 100}) =>
+      backend.watchOpen(limit: limit);
 
   @override
   Stream<List<Reminder>> watchDue({DateTime? asOf, int limit = 100}) =>
       backend.watchDue(asOf: asOf, limit: limit);
 
   @override
-  Stream<List<Reminder>> watchForPlant(String plantId) => backend.watchForPlant(plantId);
+  Stream<List<Reminder>> watchForPlant(String plantId) =>
+      backend.watchForPlant(plantId);
 
   @override
-  Future<String> createManual(Reminder reminder) => backend.createManual(reminder);
+  Future<void> addPlantToChores({
+    required String plantId,
+    required String? speciesId,
+    required List<CareProfile> profiles,
+  }) => backend.addPlantToChores(plantId);
+
+  @override
+  Future<void> removePlantChores(Iterable<String> reminderIds) =>
+      backend.removePlantChores(reminderIds);
+
+  @override
+  Future<String> createManual(Reminder reminder) =>
+      backend.createManual(reminder);
 
   @override
   Future<void> complete(String reminderId, {DateTime? completedAt}) =>
@@ -149,11 +165,14 @@ class WorkerPhotoRepository extends PhotoRepository {
   );
 
   @override
-  Stream<List<PlantPhoto>> watchPhotos(String plantId) => backend.watchPhotos(plantId);
+  Stream<List<PlantPhoto>> watchPhotos(String plantId) =>
+      backend.watchPhotos(plantId);
 
   @override
-  Future<void> deletePhoto({required String plantId, required PlantPhoto photo}) =>
-      backend.deletePhoto(plantId: plantId, photo: photo);
+  Future<void> deletePhoto({
+    required String plantId,
+    required PlantPhoto photo,
+  }) => backend.deletePhoto(plantId: plantId, photo: photo);
 }
 
 class WorkerSpeciesRepository extends SpeciesRepository {
@@ -166,17 +185,20 @@ class WorkerSpeciesRepository extends SpeciesRepository {
   final WorkerBackend backend;
 
   @override
-  Future<Species?> getSpecies(String speciesId) => backend.getSpecies(speciesId);
+  Future<Species?> getSpecies(String speciesId) =>
+      backend.getSpecies(speciesId);
 
   @override
-  Stream<Species?> watchSpecies(String speciesId) => backend.watchSpecies(speciesId);
+  Stream<Species?> watchSpecies(String speciesId) =>
+      backend.watchSpecies(speciesId);
 
   @override
   Future<List<CareProfile>> getCareProfiles(String speciesId) =>
       backend.getCareProfiles(speciesId);
 
   @override
-  Future<List<SpeciesSource>> getSources(String speciesId) => backend.getSources(speciesId);
+  Future<List<SpeciesSource>> getSources(String speciesId) =>
+      backend.getSources(speciesId);
 
   @override
   Future<SpeciesSearchResult> search(String query) => backend.search(query);
@@ -196,8 +218,10 @@ class WorkerAvatarRepository extends AvatarRepository {
   final WorkerBackend backend;
 
   @override
-  Future<String> uploadAvatar({required Uint8List bytes, required String contentType}) =>
-      backend.uploadAvatar(bytes: bytes, contentType: contentType);
+  Future<String> uploadAvatar({
+    required Uint8List bytes,
+    required String contentType,
+  }) => backend.uploadAvatar(bytes: bytes, contentType: contentType);
 }
 
 class WorkerUserSettingsRepository extends UserSettingsRepository {
@@ -218,7 +242,8 @@ class WorkerUserSettingsRepository extends UserSettingsRepository {
       backend.registerDeviceToken(token, platform: _platform);
 
   @override
-  Future<void> removeDeviceToken(String token) => backend.removeDeviceToken(token);
+  Future<void> removeDeviceToken(String token) =>
+      backend.removeDeviceToken(token);
 
   String get _platform {
     if (kIsWeb) return 'web';

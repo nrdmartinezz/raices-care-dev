@@ -197,6 +197,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               onSubmitted: busy ? null : _submit,
               enabled: !busy,
             ),
+            if (_mode.isSignUp) ...[
+              const SizedBox(height: 8),
+              Text(
+                newPasswordHint,
+                style: AppText.caption.copyWith(color: AppColors.muted),
+              ),
+            ],
             const SizedBox(height: 16),
             if (!_mode.isSignUp)
               RememberMeRow(

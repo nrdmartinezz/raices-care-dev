@@ -22,7 +22,7 @@ void main() {
 
   test('open reminders join only the plants still in the garden', () {
     final now = DateTime(2026, 10, 5, 9);
-    final kept = _plant('kept');
+    final kept = _plant('kept', lastWateredAt: now);
     final schedule = gardenScheduleFrom(
       now: now,
       plants: [kept],
@@ -38,20 +38,65 @@ void main() {
     expect(schedule.today.map((chore) => chore.reminder.id), ['today']);
     expect(schedule.later.map((chore) => chore.reminder.id), ['later']);
   });
+
+  test('a plant that still needs water is a chore for today', () {
+    final now = DateTime(2026, 10, 7, 9);
+    final schedule = gardenScheduleFrom(
+      now: now,
+      plants: [_plant('celery')],
+      reminders: [
+        _reminder(
+          'water',
+          plantId: 'celery',
+          dueAt: DateTime(2026, 10, 14),
+          intervalDays: 7,
+        ),
+      ],
+    );
+
+    expect(schedule.today.map((chore) => chore.reminder.id), ['water']);
+    expect(schedule.later, isEmpty);
+  });
+
+  test('a recent watering keeps the next check for later', () {
+    final now = DateTime(2026, 10, 7, 9);
+    final schedule = gardenScheduleFrom(
+      now: now,
+      plants: [_plant('celery', lastWateredAt: DateTime(2026, 10, 6))],
+      reminders: [
+        _reminder(
+          'water',
+          plantId: 'celery',
+          dueAt: DateTime(2026, 10, 13),
+          intervalDays: 7,
+        ),
+      ],
+    );
+
+    expect(schedule.today, isEmpty);
+    expect(schedule.later.map((chore) => chore.reminder.id), ['water']);
+  });
 }
 
-Plant _plant(String id) => Plant(
+Plant _plant(String id, {DateTime? lastWateredAt}) => Plant(
   id: id,
   speciesId: 'species',
   displayName: id,
+  currentCare: PlantCurrentCare(lastWateredAt: lastWateredAt),
 );
 
-Reminder _reminder(String id, {required String plantId, required DateTime dueAt}) {
+Reminder _reminder(
+  String id, {
+  required String plantId,
+  required DateTime dueAt,
+  int? intervalDays,
+}) {
   return Reminder(
     id: id,
     plantId: plantId,
     taskType: ReminderTaskType.waterCheck,
     title: 'Water',
     dueAt: dueAt,
+    schedule: ReminderSchedule(intervalDays: intervalDays),
   );
 }

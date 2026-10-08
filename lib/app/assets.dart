@@ -98,6 +98,18 @@ abstract final class AppIcons {
   static const socialApple = 'assets/icons/social_apple.svg';
   static const socialGoogle = 'assets/icons/social_google.svg';
   static const footerLeaf = 'assets/icons/footer_leaf.svg';
+
+  // Garden Chores hub.
+  static const choresEyebrow = 'assets/icons/chores_leaf.svg';
+  static const choresSparkle = 'assets/icons/chores_sparkle.svg';
+  static const choresDrop = 'assets/icons/chores_drop.svg';
+  static const choresSoil = 'assets/icons/chores_soil.svg';
+  static const choresPrune = 'assets/icons/chores_prune.svg';
+  static const choresMoon = 'assets/icons/moon.svg';
+  static const choresRitual = 'assets/icons/chores_ritual.svg';
+  static const choresMark = 'assets/icons/chores_mark.svg';
+  static const choresHint = 'assets/icons/chores_hint.svg';
+  static const choresAdd = 'assets/icons/chores_add.svg';
 }
 
 abstract final class AppImages {

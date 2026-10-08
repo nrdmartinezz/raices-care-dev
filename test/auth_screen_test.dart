@@ -5,6 +5,7 @@ import 'package:raices/app/app.dart';
 import 'package:raices/app/theme.dart';
 import 'package:raices/features/auth/data/auth_repository.dart';
 import 'package:raices/features/auth/domain/auth_mode.dart';
+import 'package:raices/features/auth/domain/auth_validators.dart';
 import 'package:raices/features/auth/presentation/auth_screen.dart';
 
 /// A phone-tall surface. The default 800x600 is shorter than the auth screen,
@@ -153,6 +154,24 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Use at least 8 characters.'), findsOneWidget);
+      expect(find.text(newPasswordHint), findsOneWidget);
+    });
+
+    testWidgets('sign-up rejects a password missing a special character', (
+      tester,
+    ) async {
+      _usePhoneSurface(tester);
+      await tester.pumpWidget(_authScreen(mode: AuthMode.signUp));
+      await tester.pump();
+
+      final fields = find.byType(TextFormField);
+      await tester.enterText(fields.at(0), 'Mateo');
+      await tester.enterText(fields.at(1), 'mateo@tierranueva.com');
+      await tester.enterText(fields.at(2), 'Password1');
+      await tester.tap(find.text('Create Account'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Include a special character.'), findsOneWidget);
     });
 
     testWidgets('toggling clears the errors from the other form', (

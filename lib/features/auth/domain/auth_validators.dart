@@ -9,9 +9,18 @@ library;
 /// in use; the real check is whether the verification email arrives.
 final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
-/// Firebase enforces six. Eight is asked of new accounts only, so existing
-/// users with a shorter password are not locked out of their own sign-in.
+/// Firebase enforces six. The stricter rule applies only when a password is
+/// being chosen, so an existing shorter password still opens sign-in.
 const minNewPasswordLength = 8;
+
+/// Shown beside a new-password field so the rule is visible before submit.
+const newPasswordHint =
+    'At least 8 characters, with upper and lower case, a number, and a special character.';
+
+final _lowercaseLetter = RegExp(r'\p{Ll}', unicode: true);
+final _uppercaseLetter = RegExp(r'\p{Lu}', unicode: true);
+final _digit = RegExp(r'\p{Nd}', unicode: true);
+final _specialCharacter = RegExp(r'[^\p{L}\p{N}]', unicode: true);
 
 String? validateEmail(String? value) {
   final email = value?.trim() ?? '';
@@ -29,8 +38,23 @@ String? validatePassword(String? value, {required bool isNewAccount}) {
   if (password.isEmpty) {
     return 'Enter your password.';
   }
-  if (isNewAccount && password.length < minNewPasswordLength) {
+  if (!isNewAccount) {
+    return null;
+  }
+  if (password.length < minNewPasswordLength) {
     return 'Use at least $minNewPasswordLength characters.';
+  }
+  if (!_lowercaseLetter.hasMatch(password)) {
+    return 'Include a lowercase letter.';
+  }
+  if (!_uppercaseLetter.hasMatch(password)) {
+    return 'Include an uppercase letter.';
+  }
+  if (!_digit.hasMatch(password)) {
+    return 'Include a number.';
+  }
+  if (!_specialCharacter.hasMatch(password)) {
+    return 'Include a special character.';
   }
   return null;
 }

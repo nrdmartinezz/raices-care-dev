@@ -85,9 +85,9 @@ class SpeciesRepository {
 
   Future<List<CareProfile>> getCareProfiles(String speciesId) {
     return guardFirebase(() async {
-      final snapshot = await _speciesRef(
-        speciesId,
-      ).collection('careProfiles').get();
+      final snapshot = await _speciesRef(speciesId)
+          .collection('careProfiles')
+          .get();
       return snapshot.docs.map(CareProfile.fromFirestore).toList();
     });
   }
@@ -127,8 +127,8 @@ class SpeciesRepository {
 
   /// Caches a species into /species and returns its id.
   ///
-  /// Call this before creating a plant that references it, so `onPlantCreated`
-  /// finds a care profile to seed reminders from.
+  /// Call this before creating a plant that references it, and again before
+  /// adding that plant to chores when the care profile is still missing.
   Future<String> resolve({String? speciesId, String? trefleSlug}) {
     return guardFirebase(() async {
       final response = await _functions
@@ -178,6 +178,8 @@ final careProfilesProvider = FutureProvider.family<List<CareProfile>, String>(
 );
 
 /// Provenance for one species, including the licence credit the UI must show.
-final speciesSourcesProvider = FutureProvider.family<List<SpeciesSource>, String>(
-  (ref, speciesId) => ref.watch(speciesRepositoryProvider).getSources(speciesId),
-);
+final speciesSourcesProvider =
+    FutureProvider.family<List<SpeciesSource>, String>(
+      (ref, speciesId) =>
+          ref.watch(speciesRepositoryProvider).getSources(speciesId),
+    );

@@ -24,8 +24,8 @@ class CareProfileDerivation {
       );
 }
 
-/// One repeating task on a care profile. `onPlantCreated` turns each of these
-/// into a reminder when a plant is added.
+/// One repeating task on a care profile. `addPlantToChores` turns each of
+/// these into a reminder when the gardener puts the plant on the schedule.
 class CareProfileTask {
   const CareProfileTask({
     required this.taskType,

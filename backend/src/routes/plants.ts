@@ -170,16 +170,40 @@ plantRoutes.post("/v1/plants", async (c) => {
     throw new ApiError(409, "conflict", "That id is already in use.");
   }
 
-  await seedPlantReminders(c.env.DB, {
-    userId,
-    plantId: id,
-    speciesId,
-    careProfileId: body.careProfileId,
-  });
-
   const row = await loadPlant(c.env.DB, userId, id);
   c.header("ETag", `"${row.revision}"`);
   return c.json(plantJson(row), 201);
+});
+
+plantRoutes.post("/v1/plants/:plantId/chores", async (c) => {
+  const userId = c.get("userId");
+  const plantId = clientId(c.req.param("plantId"), "plantId");
+  const row = await loadPlant(c.env.DB, userId, plantId);
+  if (!row.species_id) {
+    throw new ApiError(
+      412,
+      "failed_precondition",
+      "This plant has no species to build a care rhythm from.",
+    );
+  }
+  const profile = await c.env.DB.prepare(
+    "SELECT id FROM care_profiles WHERE species_id = ? LIMIT 1",
+  )
+    .bind(row.species_id)
+    .first();
+  if (!profile) {
+    throw new ApiError(
+      412,
+      "failed_precondition",
+      "This species has no care profile yet.",
+    );
+  }
+  await seedPlantReminders(c.env.DB, {
+    userId,
+    plantId,
+    speciesId: row.species_id,
+  });
+  return c.json({ ok: true });
 });
 
 plantRoutes.get("/v1/plants/:plantId", async (c) => {

@@ -28,8 +28,8 @@ import 'care_labels.dart';
 /// One plant: what it is, where it lives, what it needs next, and the notes
 /// kept about it.
 ///
-/// The care rhythm shown here is seeded by `onPlantCreated` a moment after the
-/// plant is written, so everything streams rather than loads once.
+/// Chores are opt-in. Adding the plant to the schedule writes reminders from
+/// its catalog care profile, and the open-reminder stream fills this page in.
 class PlantDetailScreen extends ConsumerStatefulWidget {
   const PlantDetailScreen({
     super.key,
@@ -50,6 +50,7 @@ class PlantDetailScreen extends ConsumerStatefulWidget {
 class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
   late bool _showBanner = widget.isNew;
   var _removing = false;
+  var _scheduling = false;
   String? _error;
 
   @override
@@ -121,6 +122,9 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
           reminders: reminders,
           waterTask: waterTask,
           now: now,
+          isBusy: _scheduling,
+          onAdd: () => _addToChores(plant),
+          onRemove: () => _removeFromChores(plant, reminders),
         ),
         const SizedBox(height: AppSizes.sectionGap),
         _CareGuide(species: species, waterTask: waterTask),
@@ -165,6 +169,79 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
       }
     }
     return null;
+  }
+
+  /// Resolves the species when its care profile is missing, then writes the
+  /// chores from that profile. A fresh catalog cache is reused.
+  Future<void> _addToChores(Plant plant) async {
+    if (_scheduling) {
+      return;
+    }
+    setState(() {
+      _scheduling = true;
+      _error = null;
+    });
+    try {
+      final profiles = ref.read(careProfilesProvider(plant.speciesId)).value;
+      final needsResolve =
+          plant.catalogStatus == CatalogStatus.speciesMissing ||
+          profiles == null ||
+          profiles.isEmpty ||
+          profiles.every((profile) => profile.tasks.isEmpty);
+      if (needsResolve && plant.speciesId.isNotEmpty) {
+        await ref
+            .read(speciesRepositoryProvider)
+            .resolve(speciesId: plant.speciesId);
+        ref.invalidate(careProfilesProvider(plant.speciesId));
+      }
+      final resolved = await ref.read(
+        careProfilesProvider(plant.speciesId).future,
+      );
+      await ref
+          .read(reminderRepositoryProvider)
+          .addPlantToChores(
+            plantId: plant.id,
+            speciesId: plant.speciesId.isEmpty ? null : plant.speciesId,
+            profiles: resolved,
+          );
+    } on AppException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _scheduling = false);
+      }
+    }
+  }
+
+  /// Deletes the care chores. Logged care stays on the plant.
+  Future<void> _removeFromChores(Plant plant, List<Reminder> reminders) async {
+    if (_scheduling) {
+      return;
+    }
+    final ids = [
+      for (final reminder in reminders)
+        if (reminder.isPlantChore(plant.id)) reminder.id,
+    ];
+    if (ids.isEmpty) {
+      return;
+    }
+    setState(() {
+      _scheduling = true;
+      _error = null;
+    });
+    try {
+      await ref.read(reminderRepositoryProvider).removePlantChores(ids);
+    } on AppException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _scheduling = false);
+      }
+    }
   }
 
   /// Logging the event is the only way to move the plant's care dates: the
@@ -299,8 +376,8 @@ class _AddedBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$name is part of your garden. Its care rhythm is being '
-                  'prepared.',
+                  '$name is in your garden. Add it to chores when you '
+                  'want a care rhythm.',
                   style: AppText.caption.copyWith(color: AppColors.green),
                 ),
               ],
@@ -571,12 +648,21 @@ class _NextCare extends StatelessWidget {
     required this.reminders,
     required this.waterTask,
     required this.now,
+    required this.isBusy,
+    required this.onAdd,
+    required this.onRemove,
   });
 
   final Plant plant;
   final List<Reminder> reminders;
   final CareProfileTask? waterTask;
   final DateTime now;
+  final bool isBusy;
+  final VoidCallback onAdd;
+  final VoidCallback onRemove;
+
+  bool get _onSchedule =>
+      reminders.any((reminder) => reminder.isPlantChore(plant.id));
 
   @override
   Widget build(BuildContext context) {
@@ -598,59 +684,99 @@ class _NextCare extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppSizes.cardRadius + 4),
             border: Border.all(color: AppColors.border),
           ),
-          child: next == null
-              ? Text(
-                  'No care is scheduled yet. Reminders appear once the '
-                  'catalog has built a rhythm for this plant.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (next == null)
+                Text(
+                  'This plant is not on the chores list yet.',
                   style: AppText.bodyLarge.copyWith(color: AppColors.body),
                 )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              else ...[
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        SvgPicture.asset(
-                          AppIcons.nextCareDroplet,
-                          width: 18,
-                          height: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            next.title,
-                            style: AppText.title.copyWith(color: AppColors.ink),
-                          ),
-                        ),
-                        Text(
-                          dueLabel(next.dueAt, now: now),
-                          style: AppText.label.copyWith(
-                            color: next.dueAt.isAfter(now)
-                                ? AppColors.green
-                                : AppColors.terracotta,
-                          ),
-                        ),
-                      ],
+                    SvgPicture.asset(
+                      AppIcons.nextCareDroplet,
+                      width: 18,
+                      height: 18,
                     ),
-                    if (next.instructions case final instructions?) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        instructions,
-                        style: AppText.bodyLarge.copyWith(
-                          color: AppColors.body,
-                        ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        next.title,
+                        style: AppText.title.copyWith(color: AppColors.ink),
                       ),
-                    ],
-                    if (_cycle case final progress?) ...[
-                      const SizedBox(height: 12),
-                      _Meter(progress: progress),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Since the last watering',
-                        style: AppText.caption.copyWith(color: AppColors.body),
+                    ),
+                    Text(
+                      dueLabel(next.dueAt, now: now),
+                      style: AppText.label.copyWith(
+                        color: next.dueAt.isAfter(now)
+                            ? AppColors.green
+                            : AppColors.terracotta,
                       ),
-                    ],
+                    ),
                   ],
                 ),
+                if (next.instructions case final instructions?) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    instructions,
+                    style: AppText.bodyLarge.copyWith(color: AppColors.body),
+                  ),
+                ],
+                if (_cycle case final progress?) ...[
+                  const SizedBox(height: 12),
+                  _Meter(progress: progress),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Since the last watering',
+                    style: AppText.caption.copyWith(color: AppColors.body),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 12),
+              if (_onSchedule) ...[
+                Text(
+                  'On the schedule',
+                  style: AppText.label.copyWith(color: AppColors.green),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: isBusy ? null : onRemove,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      isBusy ? 'Removing…' : 'Remove from chores',
+                      style: AppText.titleSemiBold.copyWith(
+                        color: AppColors.terracotta,
+                      ),
+                    ),
+                  ),
+                ),
+              ] else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: isBusy ? null : onAdd,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      isBusy ? 'Adding…' : 'Add to chores',
+                      style: AppText.titleSemiBold.copyWith(
+                        color: AppColors.green,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );

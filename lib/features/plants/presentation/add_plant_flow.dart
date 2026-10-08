@@ -18,9 +18,8 @@ import '../domain/plant.dart';
 /// The two steps of adding a plant: choose a species, then set it up.
 ///
 /// Searching writes nothing. Picking a result and pressing continue runs
-/// [SpeciesRepository.resolve], which caches the species so `onPlantCreated`
-/// finds a care profile to seed reminders from. Shared by onboarding and
-/// `/add-plant`.
+/// [SpeciesRepository.resolve], which caches the species and the care profile
+/// chores are later drawn from. Shared by onboarding and `/add-plant`.
 class AddPlantFlow extends ConsumerStatefulWidget {
   const AddPlantFlow({
     super.key,
@@ -458,7 +457,8 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
           for (final candidate in _results) ...[
             _ResultCard(
               candidate: candidate,
-              isSelected: candidate.trefleSlug == _selected?.trefleSlug &&
+              isSelected:
+                  candidate.trefleSlug == _selected?.trefleSlug &&
                   candidate.scientificName == _selected?.scientificName,
               onTap: _busy
                   ? null
@@ -1010,10 +1010,7 @@ class _Tag extends StatelessWidget {
         color: AppColors.mintSoft,
         borderRadius: BorderRadius.circular(AppSizes.pill),
       ),
-      child: Text(
-        label,
-        style: AppText.label.copyWith(color: AppColors.green),
-      ),
+      child: Text(label, style: AppText.label.copyWith(color: AppColors.green)),
     );
   }
 }
@@ -1209,10 +1206,7 @@ class _SectionCopy extends StatelessWidget {
             ),
             if (optional)
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceBlush,
                   borderRadius: BorderRadius.circular(AppSizes.pill),
@@ -1231,10 +1225,7 @@ class _SectionCopy extends StatelessWidget {
         ),
         if (description case final text?) ...[
           const SizedBox(height: 4),
-          Text(
-            text,
-            style: AppText.bodyLarge.copyWith(color: AppColors.body),
-          ),
+          Text(text, style: AppText.bodyLarge.copyWith(color: AppColors.body)),
         ],
       ],
     );
@@ -1325,9 +1316,7 @@ class _GardenCard extends StatelessWidget {
                       color: isSelected
                           ? AppColors.green
                           : AppColors.surfaceBlush,
-                      borderRadius: BorderRadius.circular(
-                        AppSizes.cardRadius,
-                      ),
+                      borderRadius: BorderRadius.circular(AppSizes.cardRadius),
                     ),
                     // One glyph per garden, tinted for the state it is in.
                     child: SvgPicture.asset(

@@ -161,7 +161,7 @@ AppException mapFirebaseException(Object error, StackTrace stackTrace) {
       'too-many-requests' => const RateLimitedException(),
       'requires-recent-login' => const RecentLoginRequiredException(),
       'weak-password' => const MalformedDataException(
-        'Use at least 8 characters.',
+        'Use at least 8 characters, with upper and lower case, a number, and a special character.',
       ),
       'invalid-email' => const MalformedDataException(
         'That does not look like an email address.',

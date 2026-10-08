@@ -189,7 +189,7 @@ service cloud.firestore {
         allow read, delete: if isOwner(userId);
 
         // A client may only add its own manual reminders. Reminders derived
-        // from a care profile are written by onPlantCreated through the
+        // from a care profile are written by addPlantToChores through the
         // Admin SDK, which is why schedule.source must be 'user' here.
         allow create: if isOwner(userId)
                       && isFilledString(incoming().plantId, 1500)

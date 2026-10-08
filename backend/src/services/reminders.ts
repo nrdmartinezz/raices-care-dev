@@ -82,7 +82,19 @@ export async function seedPlantReminders(
             due_at, status, priority, interval_days, schedule_source,
             created_at, updated_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, 'care_profile', ?, ?)
-          ON CONFLICT(id) DO NOTHING`,
+          ON CONFLICT(id) DO UPDATE SET
+            deleted_at = NULL,
+            status = 'open',
+            due_at = excluded.due_at,
+            title = excluded.title,
+            instructions = excluded.instructions,
+            priority = excluded.priority,
+            interval_days = excluded.interval_days,
+            schedule_source = 'care_profile',
+            completed_at = NULL,
+            snoozed_until = NULL,
+            updated_at = excluded.updated_at
+          WHERE reminders.deleted_at IS NOT NULL`,
         )
         .bind(
           id,

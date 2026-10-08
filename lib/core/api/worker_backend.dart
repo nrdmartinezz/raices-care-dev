@@ -53,9 +53,9 @@ class WorkerBackend {
 
   Stream<List<Plant>> watchActivePlants() {
     unawaited(_pullPlants());
-    return _database.watchCollection('plants').map(
-      (rows) => _activePlants(rows.map((row) => _plant(row.payload))),
-    );
+    return _database
+        .watchCollection('plants')
+        .map((rows) => _activePlants(rows.map((row) => _plant(row.payload))));
   }
 
   Stream<List<Plant>> watchPlantsInGarden(String gardenId) {
@@ -95,8 +95,10 @@ class WorkerBackend {
       'health': plant.status.health.wire,
       if (plant.speciesId.isNotEmpty) 'speciesId': plant.speciesId,
       if (plant.careProfileId != null) 'careProfileId': plant.careProfileId,
-      if (plant.acquiredAt != null) 'acquiredAt': plant.acquiredAt!.toUtc().toIso8601String(),
-      if (plant.plantedAt != null) 'plantedAt': plant.plantedAt!.toUtc().toIso8601String(),
+      if (plant.acquiredAt != null)
+        'acquiredAt': plant.acquiredAt!.toUtc().toIso8601String(),
+      if (plant.plantedAt != null)
+        'plantedAt': plant.plantedAt!.toUtc().toIso8601String(),
     };
     await _queue(
       id: 'garden-$gardenId',
@@ -165,7 +167,10 @@ class WorkerBackend {
     await _flushQuietly();
   }
 
-  Future<void> logEvent({required String plantId, required CareEvent event}) async {
+  Future<void> logEvent({
+    required String plantId,
+    required CareEvent event,
+  }) async {
     final id = event.id.isEmpty ? _uuid.v4() : event.id;
     final body = {
       'id': id,
@@ -215,7 +220,10 @@ class WorkerBackend {
     );
   }
 
-  Future<void> deleteEvent({required String plantId, required String eventId}) async {
+  Future<void> deleteEvent({
+    required String plantId,
+    required String eventId,
+  }) async {
     await _database.removeDocument('care_events', eventId);
     await _queue(
       id: 'care-delete-$eventId',
@@ -229,7 +237,10 @@ class WorkerBackend {
   Stream<List<Reminder>> watchOpen({int limit = 100}) {
     unawaited(_pullReminders());
     return _reminders().map(
-      (items) => items.where((item) => item.status == ReminderStatus.open).take(limit).toList(),
+      (items) => items
+          .where((item) => item.status == ReminderStatus.open)
+          .take(limit)
+          .toList(),
     );
   }
 
@@ -244,6 +255,17 @@ class WorkerBackend {
     return watchOpen().map(
       (items) => items.where((item) => item.plantId == plantId).toList(),
     );
+  }
+
+  Future<void> addPlantToChores(String plantId) async {
+    await _client.sendJson('POST', '/v1/plants/$plantId/chores');
+    await _pullReminders();
+  }
+
+  Future<void> removePlantChores(Iterable<String> reminderIds) async {
+    for (final id in reminderIds) {
+      await deleteReminder(id);
+    }
   }
 
   Future<String> createManual(Reminder reminder) async {
@@ -272,7 +294,8 @@ class WorkerBackend {
   Future<void> completeReminder(String reminderId) =>
       _reminderAction(reminderId, 'complete');
 
-  Future<void> skipReminder(String reminderId) => _reminderAction(reminderId, 'skip');
+  Future<void> skipReminder(String reminderId) =>
+      _reminderAction(reminderId, 'skip');
 
   Future<void> cancelReminder(String reminderId) =>
       _reminderAction(reminderId, 'cancel');
@@ -345,17 +368,23 @@ class WorkerBackend {
 
   Stream<List<PlantPhoto>> watchPhotos(String plantId) {
     unawaited(_pullPhotos(plantId));
-    return _database.watchCollection('photos', parentId: plantId).map(
-      (rows) => rows.map((row) => _photo(row.payload)).toList(),
-    );
+    return _database
+        .watchCollection('photos', parentId: plantId)
+        .map((rows) => rows.map((row) => _photo(row.payload)).toList());
   }
 
-  Future<void> deletePhoto({required String plantId, required PlantPhoto photo}) async {
+  Future<void> deletePhoto({
+    required String plantId,
+    required PlantPhoto photo,
+  }) async {
     await _database.removeDocument('photos', photo.id);
     await _client.sendJson('DELETE', '/v1/photos/${photo.id}');
   }
 
-  Future<String> uploadAvatar({required Uint8List bytes, required String contentType}) async {
+  Future<String> uploadAvatar({
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
     await _client.postBytes('/v1/me/avatar', bytes, contentType: contentType);
     return workerAvatarPath;
   }
@@ -390,9 +419,9 @@ class WorkerBackend {
   }
 
   Stream<List<String>> watchDeviceTokens() {
-    return _database.watchCollection('tokens').map(
-      (rows) => [for (final row in rows) row.id],
-    );
+    return _database
+        .watchCollection('tokens')
+        .map((rows) => [for (final row in rows) row.id]);
   }
 
   Future<Species?> getSpecies(String speciesId) async {
@@ -440,11 +469,7 @@ class WorkerBackend {
     final species = await getSpecies(speciesId);
     if (species == null) return const [];
     return [
-      SpeciesSource(
-        id: 'catalog',
-        provider: 'catalog',
-        externalId: speciesId,
-      ),
+      SpeciesSource(id: 'catalog', provider: 'catalog', externalId: speciesId),
     ];
   }
 
@@ -460,7 +485,8 @@ class WorkerBackend {
                   SpeciesCandidate(
                     speciesId: item['id'] as String? ?? '',
                     scientificName: item['scientificName'] as String? ?? '',
-                    commonName: (item['commonNames'] is List &&
+                    commonName:
+                        (item['commonNames'] is List &&
                             (item['commonNames'] as List).isNotEmpty)
                         ? (item['commonNames'] as List).first as String?
                         : null,
@@ -527,7 +553,10 @@ class WorkerBackend {
 
   Future<void> _pullReminders() async {
     try {
-      final json = await _client.getJson('/v1/reminders', query: {'status': 'any'});
+      final json = await _client.getJson(
+        '/v1/reminders',
+        query: {'status': 'any'},
+      );
       final results = json['results'];
       if (results is! List) return;
       for (final item in results) {
@@ -564,9 +593,9 @@ class WorkerBackend {
   }
 
   Stream<List<Reminder>> _reminders() {
-    return _database.watchCollection('reminders').map(
-      (rows) => rows.map((row) => _reminder(row.payload)).toList(),
-    );
+    return _database
+        .watchCollection('reminders')
+        .map((rows) => rows.map((row) => _reminder(row.payload)).toList());
   }
 
   Future<void> _reminderAction(String reminderId, String action) async {
@@ -676,7 +705,9 @@ class WorkerBackend {
       schedule: ReminderSchedule(
         source: ScheduleSource.fromWire(json['scheduleSource']),
         intervalDays: json['intervalDays'] as int?,
-        mode: json['intervalDays'] == null ? ScheduleMode.manual : ScheduleMode.interval,
+        mode: json['intervalDays'] == null
+            ? ScheduleMode.manual
+            : ScheduleMode.interval,
       ),
       completedAt: _time(json['completedAt']),
       snoozedUntil: _time(json['snoozedUntil']),
@@ -703,7 +734,9 @@ class WorkerBackend {
     return Species(
       id: json['id'] as String? ?? '',
       scientificName: json['scientificName'] as String? ?? '',
-      commonNames: names is List ? [for (final name in names) '$name'] : const [],
+      commonNames: names is List
+          ? [for (final name in names) '$name']
+          : const [],
       commonName: names is List && names.isNotEmpty ? '${names.first}' : null,
       plantGroups: json['plantGroups'] is List
           ? [for (final group in json['plantGroups'] as List) '$group']

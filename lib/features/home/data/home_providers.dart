@@ -109,18 +109,20 @@ final ritualSummaryProvider = Provider<AsyncValue<RitualSummary>>((ref) {
   final plantsAsync = ref.watch(activePlantsProvider);
   final now = ref.watch(nowProvider);
 
-  // Either stream failing fails the section; neither is optional here.
-  final error = remindersAsync.error ?? plantsAsync.error;
-  if (error != null) {
-    return AsyncValue.error(
-      error,
-      remindersAsync.stackTrace ?? plantsAsync.stackTrace ?? StackTrace.empty,
-    );
-  }
-
   final reminders = remindersAsync.value;
   final plants = plantsAsync.value;
-  if (reminders == null || plants == null) {
+  final remindersReady =
+      reminders != null && (reminders.isNotEmpty || !remindersAsync.hasError);
+  final plantsReady =
+      plants != null && (plants.isNotEmpty || !plantsAsync.hasError);
+  if (!remindersReady || !plantsReady) {
+    final error = remindersAsync.error ?? plantsAsync.error;
+    if (error != null) {
+      return AsyncValue.error(
+        error,
+        remindersAsync.stackTrace ?? plantsAsync.stackTrace ?? StackTrace.empty,
+      );
+    }
     return const AsyncValue.loading();
   }
 

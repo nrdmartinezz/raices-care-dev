@@ -38,7 +38,7 @@ class ReminderSchedule {
 /// A scheduled task at /users/{uid}/reminders/{reminderId}.
 ///
 /// Two kinds live here. Reminders seeded from a species care profile are
-/// written by `onPlantCreated` with a deterministic id of
+/// written by `addPlantToChores` with a deterministic id of
 /// `{plantId}__{taskType}`, and are rolled forward rather than completed when
 /// their care event is logged. Reminders a user adds by hand carry
 /// `schedule.source == user`, which is the only value the rules let a client
@@ -82,6 +82,14 @@ class Reminder {
   /// True for reminders the scheduler owns, which the user cannot re-point at
   /// another plant.
   bool get isFromCareProfile => schedule.source == ScheduleSource.careProfile;
+
+  /// A chore belonging to this plant, whether the server wrote it or the app did.
+  ///
+  /// Server copies use [ScheduleSource.careProfile]. Copies written from the
+  /// app use the id `{plantId}__{taskType}`, because the rules only let a
+  /// client create reminders whose source is `user`.
+  bool isPlantChore(String plantId) =>
+      isFromCareProfile || id.startsWith('${plantId}__');
 
   factory Reminder.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> snapshot,

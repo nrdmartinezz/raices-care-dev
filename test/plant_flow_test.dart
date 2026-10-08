@@ -53,6 +53,13 @@ const _profile = CareProfile(
   ],
 );
 
+const _careSchedule = ReminderSchedule(
+  mode: ScheduleMode.interval,
+  source: ScheduleSource.careProfile,
+  careProfileId: 'derived',
+  intervalDays: 5,
+);
+
 final _reminders = [
   Reminder(
     id: 'r1',
@@ -60,6 +67,7 @@ final _reminders = [
     taskType: ReminderTaskType.waterCheck,
     title: 'Check soil moisture',
     dueAt: _now,
+    schedule: _careSchedule,
   ),
   Reminder(
     id: 'r2',
@@ -67,19 +75,23 @@ final _reminders = [
     taskType: ReminderTaskType.fertilize,
     title: 'Feed the soil',
     dueAt: _now.add(const Duration(days: 10)),
+    schedule: _careSchedule,
   ),
 ];
 
 /// The app with every Firebase-backed provider the plant screens read stubbed
 /// out, so routing and layout can be pumped without an initialized Firebase
 /// app.
-ProviderContainer _container() => ProviderContainer(
+ProviderContainer _container({List<Reminder>? reminders}) => ProviderContainer(
   overrides: [
     authStatusProvider.overrideWithValue(AuthStatus.signedIn),
     nowProvider.overrideWithValue(_now),
     userProfileProvider.overrideWith(
       (ref) => Stream.value(
-        AppUser(id: 'gardener', onboardingCompletedAt: DateTime.utc(2026, 1, 1)),
+        AppUser(
+          id: 'gardener',
+          onboardingCompletedAt: DateTime.utc(2026, 1, 1),
+        ),
       ),
     ),
     activePlantsProvider.overrideWith((ref) => Stream.value([_plant])),
@@ -97,13 +109,18 @@ ProviderContainer _container() => ProviderContainer(
     plantProvider('p1').overrideWith((ref) => Stream.value(_plant)),
     speciesProvider('sp1').overrideWith((ref) => Stream.value(_species)),
     careProfilesProvider('sp1').overrideWith((ref) => Future.value([_profile])),
-    plantRemindersProvider('p1').overrideWith((ref) => Stream.value(_reminders)),
-    plantObservationsProvider('p1').overrideWith((ref) => Stream.value(const [])),
+    plantRemindersProvider('p1')
+        .overrideWith((ref) => Stream.value(reminders ?? _reminders)),
+    plantObservationsProvider('p1')
+        .overrideWith((ref) => Stream.value(const [])),
   ],
 );
 
-Future<ProviderContainer> _pumpApp(WidgetTester tester) async {
-  final container = _container();
+Future<ProviderContainer> _pumpApp(
+  WidgetTester tester, {
+  List<Reminder>? reminders,
+}) async {
+  final container = _container(reminders: reminders);
   addTearDown(container.dispose);
   await tester.pumpWidget(
     UncontrolledProviderScope(container: container, child: const RaicesApp()),
@@ -132,10 +149,9 @@ void main() {
   ) async {
     final container = await _pumpApp(tester);
 
-    container.read(routerProvider).goNamed(
-      PlantDetailRoute.name,
-      pathParameters: {'plantId': 'p1'},
-    );
+    container
+        .read(routerProvider)
+        .goNamed(PlantDetailRoute.name, pathParameters: {'plantId': 'p1'});
     await tester.pumpAndSettle();
 
     // The logo bar gives way to the back-and-title header, but the tabs stay.
@@ -149,10 +165,9 @@ void main() {
   ) async {
     final container = await _pumpApp(tester);
 
-    container.read(routerProvider).goNamed(
-      PlantDetailRoute.name,
-      pathParameters: {'plantId': 'p1'},
-    );
+    container
+        .read(routerProvider)
+        .goNamed(PlantDetailRoute.name, pathParameters: {'plantId': 'p1'});
     await tester.pumpAndSettle();
 
     expect(find.text('Tomato'), findsOneWidget);
@@ -174,5 +189,33 @@ void main() {
       find.text('Plenty of direct sun', skipOffstage: false),
       findsOneWidget,
     );
+
+    // Care-profile reminders mean the plant is already on the schedule.
+    expect(find.text('On the schedule', skipOffstage: false), findsOneWidget);
+    expect(
+      find.text('Remove from chores', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(find.text('Add to chores', skipOffstage: false), findsNothing);
+  });
+
+  testWidgets('a plant with no chores offers to add it', (tester) async {
+    final container = await _pumpApp(tester, reminders: const []);
+
+    container
+        .read(routerProvider)
+        .goNamed(PlantDetailRoute.name, pathParameters: {'plantId': 'p1'});
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'This plant is not on the chores list yet.',
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Add to chores', skipOffstage: false), findsOneWidget);
+    expect(find.text('Remove from chores', skipOffstage: false), findsNothing);
+    expect(find.text('On the schedule', skipOffstage: false), findsNothing);
   });
 }

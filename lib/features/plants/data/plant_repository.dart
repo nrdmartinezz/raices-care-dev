@@ -60,7 +60,9 @@ class PlantRepository {
     return _plants
         .doc(plantId)
         .snapshots()
-        .map((snapshot) => snapshot.exists ? Plant.fromFirestore(snapshot) : null);
+        .map(
+          (snapshot) => snapshot.exists ? Plant.fromFirestore(snapshot) : null,
+        );
   }
 
   Future<Plant?> getPlant(String plantId) {
@@ -73,8 +75,8 @@ class PlantRepository {
   /// Creates a plant and returns its id.
   ///
   /// The id is generated here rather than by Firestore so the caller can
-  /// reference the plant immediately. Reminders are seeded asynchronously by
-  /// `onPlantCreated`, so expect them to appear a moment later.
+  /// reference the plant immediately. Chores are not created with the plant;
+  /// the plant page adds them once a care profile exists.
   Future<String> createPlant(Plant plant) {
     return guardFirebase(() async {
       final id = plant.id.isEmpty ? _uuid.v4() : plant.id;
@@ -85,7 +87,9 @@ class PlantRepository {
 
   Future<void> updatePlant(Plant plant) {
     return guardFirebase(
-      () => _plants.doc(plant.id).set(plant.toUpdateJson(), SetOptions(merge: true)),
+      () => _plants
+          .doc(plant.id)
+          .set(plant.toUpdateJson(), SetOptions(merge: true)),
     );
   }
 
@@ -138,8 +142,7 @@ final activePlantsProvider = StreamProvider<List<Plant>>((ref) {
 });
 
 /// One plant, watched rather than fetched: `onPlantCreated` fills in the
-/// care fields a moment after the document appears, and the profile should
-/// show them as they land.
+/// species snapshot a moment after the document appears.
 final plantProvider = StreamProvider.family<Plant?, String>((ref, plantId) {
   if (ref.watch(currentUserIdProvider) == null) {
     return Stream.value(null);

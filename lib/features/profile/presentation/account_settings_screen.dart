@@ -437,7 +437,7 @@ class _SettingsBody extends StatelessWidget {
             _UpdateCard(
               icon: AppIcons.accountLock,
               title: 'Change password',
-              status: 'Choose a new password for your account.',
+              status: newPasswordHint,
               formKey: passwordForm,
               notice: passwordNotice,
               buttonLabel: 'Update password',
@@ -475,9 +475,12 @@ class _SettingsBody extends StatelessWidget {
                   autofillHints: const [AutofillHints.newPassword],
                   enabled: !passwordBusy,
                   validator: (value) {
-                    final length = validatePassword(value, isNewAccount: true);
-                    if (length != null) {
-                      return length;
+                    final passwordError = validatePassword(
+                      value,
+                      isNewAccount: true,
+                    );
+                    if (passwordError != null) {
+                      return passwordError;
                     }
                     if (value != newPassword.text) {
                       return 'Those passwords do not match.';

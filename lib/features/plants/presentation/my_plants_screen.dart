@@ -225,8 +225,8 @@ class _PlantRowCard extends ConsumerWidget {
                         _Tag(label: plantStageLabel(plant.plantAgeStage)),
                       ],
                     ),
-                    if (next case final reminder?) ...[
-                      const SizedBox(height: 8),
+                    const SizedBox(height: 8),
+                    if (next case final reminder?)
                       Row(
                         children: [
                           SvgPicture.asset(
@@ -249,8 +249,14 @@ class _PlantRowCard extends ConsumerWidget {
                             ),
                           ),
                         ],
+                      )
+                    else
+                      Text(
+                        'Not on chores',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.caption.copyWith(color: AppColors.body),
                       ),
-                    ],
                   ],
                 ),
               ),

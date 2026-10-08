@@ -89,7 +89,7 @@ void main() {
 
     await tester.tap(find.text('Chores'));
     await tester.pumpAndSettle();
-    expect(find.text('THE SCHEDULE'), findsOneWidget);
+    expect(find.text('Garden Chores'), findsOneWidget);
 
     await tester.tap(find.text('Wisdom'));
     await tester.pumpAndSettle();
