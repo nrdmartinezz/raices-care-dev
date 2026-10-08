@@ -14,6 +14,10 @@ import '../../care/domain/care_event.dart';
 import '../../care/domain/care_task_type.dart';
 import '../../care/domain/reminder.dart';
 import '../../home/data/home_providers.dart';
+import '../../planting/data/planting_repository.dart';
+import '../../planting/domain/harvest_countdown.dart';
+import '../../planting/domain/sowing_calendar.dart';
+import '../../planting/presentation/sowing_calendar_section.dart';
 import '../data/observation_repository.dart';
 import '../data/plant_repository.dart';
 import '../data/species_repository.dart';
@@ -90,6 +94,14 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
     // Every date on this screen is read as "how far from now", so the clock
     // comes from the provider the rest of the app pins in tests.
     final now = ref.watch(nowProvider);
+    final calendarAsync = ref.watch(sowingForSpeciesProvider(plant.speciesId));
+    final calendar = calendarAsync.value;
+    final harvestDays = _harvestDays(calendarAsync, species);
+    final remaining = HarvestCountdown.remainingDays(
+      daysToHarvest: harvestDays,
+      createdAt: plant.createdAt,
+      now: now,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,8 +138,12 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
           onAdd: () => _addToChores(plant),
           onRemove: () => _removeFromChores(plant, reminders),
         ),
+        if (remaining != null) ...[
+          const SizedBox(height: AppSizes.sectionGap),
+          _HarvestCountdown(days: remaining),
+        ],
         const SizedBox(height: AppSizes.sectionGap),
-        _CareGuide(species: species, waterTask: waterTask),
+        _CareGuide(species: species, waterTask: waterTask, calendar: calendar),
         const SizedBox(height: AppSizes.sectionGap),
         _Upcoming(reminders: reminders, now: now),
         const SizedBox(height: AppSizes.sectionGap),
@@ -820,11 +836,47 @@ class _Meter extends StatelessWidget {
 
 /// Watering and light only. The catalog has more, but the rest is reference
 /// botany rather than something to act on today.
+int? _harvestDays(AsyncValue<SowingCalendar?>? calendar, Species? species) {
+  final fallback = species?.growth.daysToHarvest;
+  if (calendar == null) return fallback;
+  if (calendar.isLoading && !calendar.hasValue) return null;
+  return calendar.value?.daysToHarvest ?? fallback;
+}
+
+class _HarvestCountdown extends StatelessWidget {
+  const _HarvestCountdown({required this.days});
+
+  final int days;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          HarvestCountdown.label(days),
+          style: AppText.title.copyWith(color: AppColors.ink),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Counted from the day you added this plant.',
+          style: AppText.caption.copyWith(color: AppColors.muted),
+        ),
+      ],
+    );
+  }
+}
+
 class _CareGuide extends StatelessWidget {
-  const _CareGuide({required this.species, required this.waterTask});
+  const _CareGuide({
+    required this.species,
+    required this.waterTask,
+    required this.calendar,
+  });
 
   final Species? species;
   final CareProfileTask? waterTask;
+  final SowingCalendar? calendar;
 
   @override
   Widget build(BuildContext context) {
@@ -834,6 +886,10 @@ class _CareGuide extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeading(icon: AppIcons.careGuideHeading, title: 'Care guide'),
+        if (calendar != null && calendar!.hasWindows) ...[
+          const SizedBox(height: 10),
+          SowingCalendarSection(calendar: calendar!),
+        ],
         const SizedBox(height: 10),
         _CareCard(
           icon: AppIcons.careWatering,

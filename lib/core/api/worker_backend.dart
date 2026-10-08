@@ -21,14 +21,11 @@ import 'authenticated_image.dart';
 /// Local cache plus the Worker. Widgets keep using the existing repositories.
 class WorkerBackend {
   WorkerBackend({
-    required ApiClient client,
+    required this._client,
     required AppDatabase database,
-    required SyncEngine sync,
-    required String? userId,
-  }) : _client = client,
-       _database = database,
-       _sync = sync,
-       _userId = userId;
+    required this._sync,
+    required this._userId,
+  }) : _database = database;
 
   final ApiClient _client;
   final AppDatabase _database;
@@ -394,8 +391,8 @@ class WorkerBackend {
       'PUT',
       '/v1/me',
       body: {
-        if (displayName != null) 'displayName': displayName,
-        if (email != null) 'email': email,
+        'displayName': ?displayName,
+        'email': ?email,
       },
     );
   }
@@ -409,7 +406,7 @@ class WorkerBackend {
     await _client.sendJson(
       'POST',
       '/v1/me/devices',
-      body: {'token': token, if (platform != null) 'platform': platform},
+      body: {'token': token, 'platform': ?platform},
     );
   }
 
@@ -510,8 +507,8 @@ class WorkerBackend {
       'POST',
       '/v1/species/resolve',
       body: {
-        if (speciesId != null) 'speciesId': speciesId,
-        if (trefleSlug != null) 'trefleSlug': trefleSlug,
+        'speciesId': ?speciesId,
+        'trefleSlug': ?trefleSlug,
       },
     );
     final id = json['id'] as String?;

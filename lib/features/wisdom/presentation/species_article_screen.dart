@@ -6,6 +6,9 @@ import '../../../app/theme.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/domain/app_user.dart';
+import '../../planting/data/planting_repository.dart';
+import '../../planting/domain/sowing_calendar.dart';
+import '../../planting/presentation/sowing_calendar_section.dart';
 import '../../plants/data/species_repository.dart';
 import '../../plants/domain/care_profile.dart';
 import '../../plants/domain/species.dart';
@@ -42,10 +45,7 @@ class _SpeciesArticleScreenState extends ConsumerState<SpeciesArticleScreen> {
     try {
       final id = await ref
           .read(speciesRepositoryProvider)
-          .resolve(
-            speciesId: widget.speciesId,
-            trefleSlug: widget.trefleSlug,
-          );
+          .resolve(speciesId: widget.speciesId, trefleSlug: widget.trefleSlug);
       if (mounted) {
         setState(() {
           _resolvedId = id;
@@ -82,6 +82,7 @@ class _SpeciesArticleScreenState extends ConsumerState<SpeciesArticleScreen> {
     }
 
     final speciesAsync = ref.watch(speciesProvider(id));
+    final calendar = ref.watch(sowingForSpeciesProvider(id)).value;
     final profiles = ref.watch(careProfilesProvider(id)).value;
     final sources = ref.watch(speciesSourcesProvider(id)).value;
     final unit =
@@ -112,6 +113,7 @@ class _SpeciesArticleScreenState extends ConsumerState<SpeciesArticleScreen> {
             profiles: profiles ?? const [],
             sources: sources ?? const [],
             unit: unit,
+            calendar: calendar,
           );
         },
       ),
@@ -125,12 +127,14 @@ class _Article extends StatelessWidget {
     required this.profiles,
     required this.sources,
     required this.unit,
+    required this.calendar,
   });
 
   final Species species;
   final List<CareProfile> profiles;
   final List<SpeciesSource> sources;
   final TemperatureUnit unit;
+  final SowingCalendar? calendar;
 
   @override
   Widget build(BuildContext context) {
@@ -138,9 +142,7 @@ class _Article extends StatelessWidget {
     final showScientific =
         scientific.isNotEmpty && scientific != species.displayName;
     final facts = _facts(species.growth, unit);
-    final tasks = [
-      for (final profile in profiles) ...profile.tasks,
-    ];
+    final tasks = [for (final profile in profiles) ...profile.tasks];
     final credit = _credit(species, sources);
 
     return Column(
@@ -181,10 +183,7 @@ class _Article extends StatelessWidget {
         ],
         if (facts.isNotEmpty) ...[
           const SizedBox(height: AppSizes.sectionGap),
-          Text(
-            'Growing',
-            style: AppText.title.copyWith(color: AppColors.ink),
-          ),
+          Text('Growing', style: AppText.title.copyWith(color: AppColors.ink)),
           const SizedBox(height: 10),
           for (final fact in facts) ...[
             Text(
@@ -200,10 +199,11 @@ class _Article extends StatelessWidget {
           ],
         ],
         const SizedBox(height: AppSizes.sectionGap),
-        Text(
-          'Care',
-          style: AppText.title.copyWith(color: AppColors.ink),
-        ),
+        Text('Care', style: AppText.title.copyWith(color: AppColors.ink)),
+        if (calendar != null && calendar!.hasWindows) ...[
+          const SizedBox(height: 12),
+          SowingCalendarSection(calendar: calendar!),
+        ],
         const SizedBox(height: 10),
         if (tasks.isEmpty)
           Text(
@@ -217,10 +217,7 @@ class _Article extends StatelessWidget {
           ],
         if (credit.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(
-            credit,
-            style: AppText.caption.copyWith(color: AppColors.muted),
-          ),
+          Text(credit, style: AppText.caption.copyWith(color: AppColors.muted)),
         ],
       ],
     );
@@ -245,10 +242,7 @@ class _TaskCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            task.title,
-            style: AppText.title.copyWith(color: AppColors.ink),
-          ),
+          Text(task.title, style: AppText.title.copyWith(color: AppColors.ink)),
           const SizedBox(height: 2),
           Text(
             'Every ${task.intervalDays} days',
@@ -303,16 +297,10 @@ List<({String label, String value})> _facts(
     facts.add((label: 'Light', value: lightLabel(growth.light)));
   }
   if (growth.atmosphericHumidity != null) {
-    facts.add((
-      label: 'Humidity',
-      value: '${growth.atmosphericHumidity} / 10',
-    ));
+    facts.add((label: 'Humidity', value: '${growth.atmosphericHumidity} / 10'));
   }
   if (growth.soilMoisture != null) {
-    facts.add((
-      label: 'Soil moisture',
-      value: '${growth.soilMoisture} / 10',
-    ));
+    facts.add((label: 'Soil moisture', value: '${growth.soilMoisture} / 10'));
   }
   final temperature = _temperature(growth, unit);
   if (temperature != null) {
@@ -325,10 +313,7 @@ List<({String label, String value})> _facts(
     ));
   }
   if (growth.daysToHarvest != null) {
-    facts.add((
-      label: 'Days to harvest',
-      value: '${growth.daysToHarvest}',
-    ));
+    facts.add((label: 'Days to harvest', value: '${growth.daysToHarvest}'));
   }
   return facts;
 }

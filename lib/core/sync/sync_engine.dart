@@ -13,11 +13,10 @@ import '../local/app_database.dart';
 /// so a retry cannot create a second plant or care event.
 class SyncEngine {
   SyncEngine({
-    required AppDatabase database,
+    required this._database,
     required ApiClient client,
     Connectivity? connectivity,
-  }) : _database = database,
-       _client = client,
+  }) : _client = client,
        _connectivity = connectivity ?? Connectivity();
 
   final AppDatabase _database;

@@ -8,6 +8,8 @@ import '../../../app/router.dart';
 import '../../../app/shell/app_shell.dart';
 import '../../../app/theme.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../planting/data/planting_repository.dart';
+import '../../planting/presentation/frost_calendar_card.dart';
 import '../../plants/data/recent_searches.dart';
 import '../../plants/data/species_repository.dart';
 
@@ -27,6 +29,7 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
   String? _term;
   String? _attribution;
   List<SpeciesCandidate> _results = const [];
+  Map<String, bool?> _seasons = const {};
 
   static const _suggestions = [
     'Monstera',
@@ -67,7 +70,11 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
         _attribution = result.attribution;
         _searched = true;
         _term = query;
+        _seasons = const {};
       });
+      final seasons = await _seasonsFor(result.candidates);
+      if (!mounted) return;
+      setState(() => _seasons = seasons);
     } on AppException catch (error) {
       if (mounted) {
         setState(() => _error = error.message);
@@ -79,11 +86,30 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
     }
   }
 
+  Future<Map<String, bool?>> _seasonsFor(List<SpeciesCandidate> results) async {
+    final garden = ref.read(gardenFrostProvider).value;
+    final repository = ref.read(plantingRepositoryProvider);
+    if (garden is! GardenFrostReady || repository == null) return const {};
+    final names = [
+      for (final candidate in results)
+        if (candidate.scientificName.trim().isNotEmpty)
+          candidate.scientificName,
+    ];
+    if (names.isEmpty) return const {};
+    try {
+      return await repository.seasons(
+        latitude: garden.latitude,
+        longitude: garden.longitude,
+        names: names,
+      );
+    } on AppException {
+      return const {};
+    }
+  }
+
   void _open(SpeciesCandidate candidate) {
     final slug = candidate.trefleSlug;
-    final id = candidate.speciesId.isNotEmpty
-        ? candidate.speciesId
-        : slug;
+    final id = candidate.speciesId.isNotEmpty ? candidate.speciesId : slug;
     if (id == null || id.isEmpty) {
       setState(() => _error = 'That plant has no catalog id.');
       return;
@@ -98,6 +124,16 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
   @override
   Widget build(BuildContext context) {
     final recents = ref.watch(recentSearchesProvider);
+    ref.listen(gardenFrostProvider, (previous, next) {
+      final garden = next.value;
+      if (garden is! GardenFrostReady || !_searched || _results.isEmpty) {
+        return;
+      }
+      if (_seasons.isNotEmpty) return;
+      _seasonsFor(_results).then((seasons) {
+        if (mounted) setState(() => _seasons = seasons);
+      });
+    });
 
     return ShellScrollView(
       child: Column(
@@ -108,15 +144,24 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
             style: AppText.eyebrow.copyWith(color: AppColors.green),
           ),
           const SizedBox(height: 7),
-          Text(
-            'Wisdom',
-            style: AppText.display.copyWith(color: AppColors.ink),
-          ),
+          Text('Wisdom', style: AppText.display.copyWith(color: AppColors.ink)),
           const SizedBox(height: 7),
           Text(
             'Look up a plant before you bring it home.',
             style: AppText.bodyLarge.copyWith(color: AppColors.body),
           ),
+          const SizedBox(height: AppSizes.sectionGap),
+          ref
+              .watch(gardenFrostProvider)
+              .when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (error, _) =>
+                    const FrostCalendarCard(frost: GardenFrostUnavailable()),
+                data: (frost) => FrostCalendarCard(frost: frost),
+              ),
           const SizedBox(height: AppSizes.sectionGap),
           _SearchField(
             controller: _query,
@@ -168,7 +213,11 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
                 style: AppText.bodyLarge.copyWith(color: AppColors.body),
               ),
             for (final candidate in _results) ...[
-              _ResultCard(candidate: candidate, onTap: () => _open(candidate)),
+              _ResultCard(
+                candidate: candidate,
+                inSeason: _seasons[candidate.scientificName.toLowerCase()],
+                onTap: () => _open(candidate),
+              ),
               const SizedBox(height: 12),
             ],
           ],
@@ -302,10 +351,15 @@ class _Pill extends StatelessWidget {
 }
 
 class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.candidate, required this.onTap});
+  const _ResultCard({
+    required this.candidate,
+    required this.onTap,
+    required this.inSeason,
+  });
 
   final SpeciesCandidate candidate;
   final VoidCallback onTap;
+  final bool? inSeason;
 
   @override
   Widget build(BuildContext context) {
@@ -353,6 +407,10 @@ class _ResultCard extends StatelessWidget {
                       candidate.displayName,
                       style: AppText.plantTitle.copyWith(color: AppColors.ink),
                     ),
+                    if (inSeason != null) ...[
+                      const SizedBox(height: 6),
+                      SeasonPill(inSeason: inSeason!),
+                    ],
                     if (showScientific) ...[
                       const SizedBox(height: 4),
                       Text(

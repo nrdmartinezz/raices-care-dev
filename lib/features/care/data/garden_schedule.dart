@@ -98,7 +98,7 @@ final gardenScheduleProvider = Provider<AsyncValue<GardenSchedule>>((ref) {
       plants != null && (plants.isNotEmpty || !plantsAsync.hasError);
   if (remindersReady && plantsReady) {
     return AsyncValue.data(
-      gardenScheduleFrom(reminders: reminders!, plants: plants!, now: now),
+      gardenScheduleFrom(reminders: reminders, plants: plants, now: now),
     );
   }
 

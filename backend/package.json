@@ -6,7 +6,7 @@
     "dev": "wrangler dev",
     "test": "vitest run",
     "db:migrate": "wrangler d1 migrations apply raices-care-sql --local",
-    "db:seed": "wrangler d1 execute raices-care-sql --local --file=seed/sample_species.sql",
+    "db:seed": "wrangler d1 execute raices-care-sql --local --file=seed/sample_species.sql && wrangler d1 execute raices-care-sql --local --file=seed/planting_schedules.sql && wrangler d1 execute raices-care-sql --local --file=seed/frost_stations.sql",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -14,6 +14,7 @@ import { healthRoutes } from "./routes/health";
 import { meRoutes } from "./routes/me";
 import { photoRoutes } from "./routes/photos";
 import { plantRoutes } from "./routes/plants";
+import { plantingRoutes } from "./routes/planting";
 import { reminderRoutes } from "./routes/reminders";
 import { speciesRoutes } from "./routes/species";
 
@@ -29,6 +30,7 @@ export function createApp(options?: { jwks?: JWTVerifyGetKey }) {
   app.route("/", healthRoutes);
   app.route("/", meRoutes);
   app.route("/", speciesRoutes);
+  app.route("/", plantingRoutes);
   app.route("/", gardenRoutes);
   app.route("/", plantRoutes);
   app.route("/", careRoutes);

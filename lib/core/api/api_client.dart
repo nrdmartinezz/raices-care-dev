@@ -8,9 +8,8 @@ import 'api_config.dart';
 
 /// Talks to the Worker. Every request carries the current Firebase ID token.
 class ApiClient {
-  ApiClient({Dio? dio, required FirebaseAuth auth})
-    : _auth = auth,
-      _dio =
+  ApiClient({Dio? dio, required this._auth})
+    : _dio =
           dio ??
           Dio(
             BaseOptions(
@@ -66,8 +65,8 @@ class ApiClient {
         options: Options(
           method: method,
           headers: {
-            if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey,
-            if (ifMatch != null) 'If-Match': ifMatch,
+            'Idempotency-Key': ?idempotencyKey,
+            'If-Match': ?ifMatch,
           },
         ),
       ),
