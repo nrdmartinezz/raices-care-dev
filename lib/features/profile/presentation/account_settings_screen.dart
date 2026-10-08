@@ -264,7 +264,8 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       context,
       icon: const AppIconBadge(icon: AppIcons.accountAlert),
       title: 'Delete account?',
-      message: 'Are you sure you want to delete your account?',
+      message:
+          'This removes your plants, care history, reminders, and photos.',
       confirmLabel: 'Delete account',
     );
     if (!confirmed || !mounted) {

@@ -418,6 +418,15 @@ class WorkerBackend {
     await _client.sendJson('DELETE', '/v1/me/devices', body: {'token': token});
   }
 
+  /// Marks this account's Worker rows deleted and drops the local copy.
+  ///
+  /// Must run while the Firebase token is still valid. The caller then deletes
+  /// the Auth user.
+  Future<void> deleteAccount() async {
+    await _client.sendJson('DELETE', '/v1/me');
+    await _database.clearPersonalData();
+  }
+
   Stream<List<String>> watchDeviceTokens() {
     return _database
         .watchCollection('tokens')

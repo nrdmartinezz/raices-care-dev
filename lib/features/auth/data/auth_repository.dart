@@ -18,11 +18,15 @@ class AuthRepository {
     required this._auth,
     required this._firestore,
     this._syncAccount,
+    this._deleteRemoteAccount,
   });
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
   final Future<void> Function({String? displayName, String? email})? _syncAccount;
+
+  /// Worker rows, while the ID token can still authorize the request.
+  final Future<void> Function()? _deleteRemoteAccount;
 
   User? get currentUser => _auth.currentUser;
 
@@ -308,9 +312,11 @@ class AuthRepository {
 
   /// Removes the sign-in account after an optional password check.
   ///
-  /// The profile document is removed while the session can still write it.
-  /// Plant and reminder documents stay under this id; Firestore does not
-  /// delete them with the parent.
+  /// The profile document is deleted while the session can still write it.
+  /// That deletion wakes `onUserDeleted`, which removes the plants, care
+  /// history, reminders, and photos Firestore would otherwise leave behind.
+  /// The Worker copy, when the app is using it, is removed first, while the
+  /// ID token is still valid.
   Future<void> deleteAccount({String? currentPassword}) {
     return guardFirebase(() async {
       final user = _requireUser();
@@ -320,9 +326,8 @@ class AuthRepository {
       } else if (!_signedInRecently(user)) {
         throw const RecentLoginRequiredException();
       }
-      final profile = _profileRef(user.uid);
-      await profile.collection('settings').doc('private').delete();
-      await profile.delete();
+      await _deleteRemoteAccount?.call();
+      await _profileRef(user.uid).delete();
       await user.delete();
     });
   }
@@ -371,6 +376,9 @@ final authRepositoryProvider = Provider<AuthRepository>(
         ? ({displayName, email}) => ref
               .read(workerBackendProvider)
               .syncProfile(displayName: displayName, email: email)
+        : null,
+    deleteRemoteAccount: usesWorkerApi
+        ? () => ref.read(workerBackendProvider).deleteAccount()
         : null,
   ),
 );

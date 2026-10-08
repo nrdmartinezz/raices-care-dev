@@ -206,15 +206,24 @@ class _Hub extends StatelessWidget {
     final today = _dateOnly(now);
     final focus = day ?? today;
     final all = [...schedule.overdue, ...schedule.today, ...schedule.later];
+    final wateringNow = _wateringDue(all: all, plants: plants, now: now);
+    final wateringNowIds = {for (final chore in wateringNow) chore.reminder.id};
     final visible = _visibleChores(
       schedule: schedule,
       all: all,
       lens: lens,
       focus: focus,
       now: now,
+      wateringNow: wateringNow,
     );
+    final dueTodayCount = _dueTodayCount(schedule, wateringNow);
     final week = _weekDays(today);
-    final upcoming = _comingUp(schedule.later, today);
+    final upcoming = _comingUp(
+      schedule.later
+          .where((chore) => !wateringNowIds.contains(chore.reminder.id))
+          .toList(),
+      today,
+    );
     final showingToday = lens == _ChoreLens.today && _sameDay(focus, today);
 
     return Column(
@@ -222,24 +231,38 @@ class _Hub extends StatelessWidget {
       children: [
         _HarmonyCard(
           done: careActionsToday(plants, now: now),
-          openToday: schedule.today.length + schedule.overdue.length,
-          watering: _count(all, ReminderTaskType.waterCheck),
+          openToday: dueTodayCount,
+          watering: wateringNow.length,
           feeding: _count(all, ReminderTaskType.fertilize),
           pruning: _count(all, ReminderTaskType.prune),
         ),
         const SizedBox(height: AppSizes.sectionGap),
         _WeekStrip(
           days: week,
-          now: now,
           selected: lens == _ChoreLens.today ? focus : null,
-          chores: all,
+          chores: [
+            ...all,
+            for (final chore in wateringNow)
+              if (choreWhen(chore.reminder.dueAt, now) == ChoreWhen.later)
+                GardenChore(
+                  reminder: Reminder(
+                    id: chore.reminder.id,
+                    plantId: chore.plant.id,
+                    speciesId: chore.plant.speciesId,
+                    taskType: ReminderTaskType.waterCheck,
+                    title: chore.reminder.title,
+                    dueAt: now,
+                  ),
+                  plant: chore.plant,
+                ),
+          ],
           phase: moonPhaseName(now),
           onDay: onDay,
         ),
         const SizedBox(height: 20),
         _Filters(
           lens: showingToday ? _ChoreLens.today : lens,
-          dueCount: schedule.today.length + schedule.overdue.length,
+          dueCount: dueTodayCount,
           daySelected: day != null && !_sameDay(day!, today),
           onLens: onLens,
         ),
@@ -455,7 +478,6 @@ class _MetricPill extends StatelessWidget {
 class _WeekStrip extends StatelessWidget {
   const _WeekStrip({
     required this.days,
-    required this.now,
     required this.selected,
     required this.chores,
     required this.phase,
@@ -463,7 +485,6 @@ class _WeekStrip extends StatelessWidget {
   });
 
   final List<DateTime> days;
-  final DateTime now;
   final DateTime? selected;
   final List<GardenChore> chores;
   final String phase;
@@ -509,7 +530,7 @@ class _WeekStrip extends StatelessWidget {
                     day: days[index],
                     selected:
                         selected != null && _sameDay(days[index], selected!),
-                    dots: _dotsFor(days[index], chores, now),
+                    dots: _dotsFor(days[index], chores),
                     onTap: () => onDay(days[index]),
                   ),
                 ),
@@ -751,13 +772,7 @@ class _ChoreCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final reminder = chore.reminder;
     final canLog = careEventFor(reminder.taskType) != null;
-    final dueToday =
-        choreWhen(choreDisplayDue(chore, now), now) != ChoreWhen.later;
-    final action = switch (reminder.taskType) {
-      ReminderTaskType.waterCheck when canLog => 'Water',
-      _ when canLog => 'Done',
-      _ => 'Skip',
-    };
+    final dueToday = choreWhen(reminder.dueAt, now) != ChoreWhen.later;
     final tag = switch (reminder.taskType) {
       ReminderTaskType.fertilize => 'NUTRITION',
       ReminderTaskType.seasonalTask || ReminderTaskType.custom => 'RITUAL',
@@ -879,29 +894,43 @@ class _ChoreCard extends StatelessWidget {
                 children: [
                   _PlantThumb(plant: chore.plant),
                   const SizedBox(height: 8),
-                  Material(
-                    color: AppColors.surfaceBlush,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: isBusy ? null : onRecord,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        child: Text(
-                          isBusy ? 'Saving' : action,
-                          style: AppText.labelSemiBold.copyWith(
-                            color: AppColors.green,
-                          ),
-                        ),
-                      ),
+                  _ChoreAction(
+                    label: _choreActionLabel(
+                      type: reminder.taskType,
+                      canLog: canLog,
+                      isBusy: isBusy,
                     ),
+                    onPressed: isBusy ? null : onRecord,
                   ),
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChoreAction extends StatelessWidget {
+  const _ChoreAction({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surfaceBlush,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text(
+            label,
+            style: AppText.labelSemiBold.copyWith(color: AppColors.green),
           ),
         ),
       ),
@@ -1268,6 +1297,7 @@ List<GardenChore> _visibleChores({
   required _ChoreLens lens,
   required DateTime focus,
   required DateTime now,
+  required List<GardenChore> wateringNow,
 }) {
   return switch (lens) {
     _ChoreLens.all => all,
@@ -1275,20 +1305,112 @@ List<GardenChore> _visibleChores({
       all
           .where(
             (chore) => _sameDay(
-              choreDisplayDue(chore, now),
+              chore.reminder.dueAt,
               _dateOnly(now).add(const Duration(days: 1)),
             ),
           )
           .toList(),
     _ChoreLens.weekend =>
-      all
-          .where((chore) => _inThisWeekend(choreDisplayDue(chore, now), now))
-          .toList(),
-    _ChoreLens.today => [
-      if (_sameDay(focus, now)) ...schedule.overdue,
-      ...all.where((chore) => _sameDay(choreDisplayDue(chore, now), focus)),
-    ],
+      all.where((chore) => _inThisWeekend(chore.reminder.dueAt, now)).toList(),
+    _ChoreLens.today => _choresForDay(
+      schedule: schedule,
+      all: all,
+      focus: focus,
+      now: now,
+      wateringNow: _sameDay(focus, now) ? wateringNow : const [],
+    ),
   };
+}
+
+List<GardenChore> _choresForDay({
+  required GardenSchedule schedule,
+  required List<GardenChore> all,
+  required DateTime focus,
+  required DateTime now,
+  required List<GardenChore> wateringNow,
+}) {
+  final listed = [
+    if (_sameDay(focus, now)) ...schedule.overdue,
+    ...all.where((chore) => _sameDay(chore.reminder.dueAt, focus)),
+  ];
+  final ids = {for (final chore in listed) chore.reminder.id};
+  return [
+    ...listed,
+    ...wateringNow.where((chore) => !ids.contains(chore.reminder.id)),
+  ];
+}
+
+/// Watering that still needs doing today: a due water reminder, a plant whose
+/// next watering has arrived, or a plant that has never been watered.
+List<GardenChore> _wateringDue({
+  required List<GardenChore> all,
+  required List<Plant> plants,
+  required DateTime now,
+}) {
+  final chores = <GardenChore>[];
+  final covered = <String>{};
+  for (final chore in all) {
+    if (chore.reminder.taskType != ReminderTaskType.waterCheck) {
+      continue;
+    }
+    final scheduled = choreWhen(chore.reminder.dueAt, now) != ChoreWhen.later;
+    if (scheduled || _needsWatering(chore.plant, now)) {
+      chores.add(chore);
+      covered.add(chore.plant.id);
+    }
+  }
+  for (final plant in plants) {
+    if (covered.contains(plant.id) || !_needsWatering(plant, now)) {
+      continue;
+    }
+    chores.add(
+      GardenChore(
+        reminder: Reminder(
+          id: 'water:${plant.id}',
+          plantId: plant.id,
+          speciesId: plant.speciesId,
+          taskType: ReminderTaskType.waterCheck,
+          title: 'Water ${plant.displayName}',
+          dueAt: now,
+        ),
+        plant: plant,
+      ),
+    );
+  }
+  return chores;
+}
+
+bool _needsWatering(Plant plant, DateTime now) {
+  final next = plant.nextActions.nextWaterCheckAt;
+  if (next != null) {
+    return !next.isAfter(now);
+  }
+  return plant.currentCare.lastWateredAt == null;
+}
+
+int _dueTodayCount(GardenSchedule schedule, List<GardenChore> wateringNow) {
+  final ids = {
+    for (final chore in [...schedule.today, ...schedule.overdue])
+      chore.reminder.id,
+  };
+  final extra = wateringNow
+      .where((chore) => !ids.contains(chore.reminder.id))
+      .length;
+  return ids.length + extra;
+}
+
+String _choreActionLabel({
+  required ReminderTaskType type,
+  required bool canLog,
+  required bool isBusy,
+}) {
+  if (isBusy) {
+    return 'Saving';
+  }
+  if (type == ReminderTaskType.waterCheck) {
+    return 'Water';
+  }
+  return canLog ? 'Done' : 'Skip';
 }
 
 String _sectionTitle(_ChoreLens lens, DateTime focus, DateTime today) {
@@ -1386,15 +1508,15 @@ String _taskIcon(ReminderTaskType type) => switch (type) {
 };
 
 String _subtitle(GardenChore chore, DateTime now) {
-  final due = choreDisplayDue(chore, now);
-  final pulledForward =
-      choreWhen(chore.reminder.dueAt, now) == ChoreWhen.later &&
-      choreWhen(due, now) != ChoreWhen.later;
-  final when = pulledForward
+  final due = chore.reminder.dueAt;
+  final needsWater =
+      chore.reminder.taskType == ReminderTaskType.waterCheck &&
+      _needsWatering(chore.plant, now);
+  final when = needsWater
       ? 'Due today'
       : choreWhen(due, now) == ChoreWhen.later
       ? dueLabel(due, now: now)
-      : formatTimeLabel(chore.reminder.dueAt);
+      : formatTimeLabel(due);
   return '$when · ${chore.plant.displayName} · ${_place(chore.plant)}';
 }
 
@@ -1436,10 +1558,10 @@ String moonPhaseName(DateTime date) {
   ][index];
 }
 
-List<Color> _dotsFor(DateTime day, List<GardenChore> chores, DateTime now) {
+List<Color> _dotsFor(DateTime day, List<GardenChore> chores) {
   final colors = <Color>[];
   for (final chore in chores) {
-    if (!_sameDay(choreDisplayDue(chore, now), day)) {
+    if (!_sameDay(chore.reminder.dueAt, day)) {
       continue;
     }
     final color = switch (chore.reminder.taskType) {

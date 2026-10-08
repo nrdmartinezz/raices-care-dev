@@ -119,6 +119,9 @@ meRoutes.delete("/v1/me", async (c) => {
     c.env.DB.prepare("UPDATE care_events SET deleted_at = ? WHERE user_id = ? AND deleted_at IS NULL").bind(ts, userId),
     c.env.DB.prepare("UPDATE photos SET deleted_at = ? WHERE user_id = ? AND deleted_at IS NULL").bind(ts, userId),
     c.env.DB.prepare("DELETE FROM device_tokens WHERE user_id = ?").bind(userId),
+    c.env.DB.prepare("DELETE FROM notification_deliveries WHERE user_id = ?").bind(userId),
+    c.env.DB.prepare("DELETE FROM idempotency_keys WHERE user_id = ?").bind(userId),
+    c.env.DB.prepare("DELETE FROM write_rates WHERE user_id = ?").bind(userId),
   ]);
   for (const photo of photos.results ?? []) {
     await c.env.IMAGES.delete(photo.object_key);

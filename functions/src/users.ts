@@ -1,7 +1,12 @@
+import { getStorage } from "firebase-admin/storage";
 import { logger } from "firebase-functions";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import {
+  onDocumentCreated,
+  onDocumentDeleted,
+} from "firebase-functions/v2/firestore";
 
 import { db, FieldValue } from "./admin";
+import { deleteUserImages, imageSecrets } from "./images";
 import { DEFAULT_REGION, SCHEMA_VERSION } from "./schema";
 
 /**
@@ -80,5 +85,40 @@ export const onUserCreated = onDocumentCreated(
     );
 
     logger.info("Initialized user", { uid, filled: Object.keys(defaults) });
+  },
+);
+
+/**
+ * Removes what Firestore leaves behind when the profile document is deleted.
+ *
+ * Deleting `users/{uid}` does not delete its subcollections. Plants, care
+ * events, photos, observations, reminders, gardens, and settings stay until
+ * this runs. Each deleted plant also wakes `onPlantDeleted`, which drops that
+ * plant's reminders and files if this pass has not reached them yet.
+ */
+export const onUserDeleted = onDocumentDeleted(
+  {
+    document: "users/{uid}",
+    region: DEFAULT_REGION,
+    secrets: imageSecrets,
+    timeoutSeconds: 540,
+  },
+  async (event) => {
+    const uid = event.params.uid;
+    const userRef = db.doc(`users/${uid}`);
+    await db.recursiveDelete(userRef);
+
+    try {
+      await getStorage().bucket().deleteFiles({ prefix: `users/${uid}/` });
+    } catch (error) {
+      logger.warn("Account file cleanup failed", { uid, error });
+    }
+
+    try {
+      const removed = await deleteUserImages(uid);
+      logger.info("Removed account leftovers", { uid, images: removed });
+    } catch (error) {
+      logger.warn("Account image cleanup failed", { uid, error });
+    }
   },
 );

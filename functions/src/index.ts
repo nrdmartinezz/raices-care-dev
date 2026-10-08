@@ -8,7 +8,7 @@
  * of the README for the deploy commands and the secrets each function needs.
  */
 
-export { onUserCreated } from "./users";
+export { onUserCreated, onUserDeleted } from "./users";
 export { onPlantCreated, onPlantDeleted, addPlantToChores } from "./plants";
 export { onCareEventCreated } from "./care";
 export { generateDueReminderNotifications } from "./reminders";

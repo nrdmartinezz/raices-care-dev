@@ -133,6 +133,61 @@ describe("records stay on their owner", () => {
     expect(body.results).toEqual([]);
   });
 
+  it("deletes the garden with the account", async () => {
+    expect(
+      (
+        await call(
+          "/v1/gardens",
+          dev("closing", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ id: "garden-closing", name: "Sill" }),
+          }),
+        )
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await call(
+          "/v1/plants",
+          dev("closing", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              id: "plant-closing",
+              gardenId: "garden-closing",
+              nickname: "Fern",
+            }),
+          }),
+        )
+      ).status,
+    ).toBe(201);
+    await env.DB.prepare(
+      `INSERT INTO reminders (id, user_id, plant_id, task_type, title, due_at, status, created_at, updated_at)
+       VALUES ('rem-closing', 'closing', 'plant-closing', 'water_check', 'Check water', ?, 'open', ?, ?)`,
+    )
+      .bind(Date.now(), Date.now(), Date.now())
+      .run();
+    await env.DB.prepare(
+      "INSERT INTO idempotency_keys (user_id, key, request_hash, status, response_json, created_at) VALUES ('closing', 'once', 'hash', 201, '{}', ?)",
+    )
+      .bind(Date.now())
+      .run();
+
+    const deleted = await call("/v1/me", dev("closing", { method: "DELETE" }));
+    expect(deleted.status).toBe(204);
+    expect((await call("/v1/me", dev("closing"))).status).toBe(404);
+    expect((await call("/v1/plants/plant-closing", dev("closing"))).status).toBe(404);
+    const reminders = await env.DB.prepare(
+      "SELECT id FROM reminders WHERE user_id = 'closing' AND deleted_at IS NULL",
+    ).all();
+    expect(reminders.results).toEqual([]);
+    const keys = await env.DB.prepare(
+      "SELECT key FROM idempotency_keys WHERE user_id = 'closing'",
+    ).all();
+    expect(keys.results).toEqual([]);
+  });
+
   it("replays a create with the same idempotency key", async () => {
     const init = dev("idem-user", {
       method: "POST",

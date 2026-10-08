@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../home/data/home_providers.dart';
 import '../../plants/data/plant_repository.dart';
 import '../../plants/domain/plant.dart';
-import '../domain/care_task_type.dart';
 import '../domain/reminder.dart';
 import 'reminder_repository.dart';
 
@@ -21,49 +20,6 @@ ChoreWhen choreWhen(DateTime dueAt, DateTime now) {
     return ChoreWhen.today;
   }
   return ChoreWhen.later;
-}
-
-/// True when this plant should be watered now.
-///
-/// A watering that has never been logged is due, and so is one whose interval
-/// has run out. The stored reminder date can still be later: adding a plant
-/// schedules the next check a full interval out, before anyone has watered it.
-bool plantNeedsWater(Plant plant, Reminder reminder, DateTime now) {
-  if (reminder.taskType != ReminderTaskType.waterCheck) {
-    return false;
-  }
-  final next = plant.nextActions.nextWaterCheckAt;
-  if (next != null) {
-    return !next.isAfter(now);
-  }
-  final last = plant.currentCare.lastWateredAt;
-  if (last == null) {
-    return true;
-  }
-  final interval = reminder.schedule.intervalDays;
-  if (interval == null || interval <= 0) {
-    return false;
-  }
-  return !last.add(Duration(days: interval)).isAfter(now);
-}
-
-/// When the chore should be done. A plant that needs water is due today even
-/// if its reminder date is still in the future.
-ChoreWhen choreDisplayWhen(Reminder reminder, Plant plant, DateTime now) {
-  final scheduled = choreWhen(reminder.dueAt, now);
-  if (scheduled == ChoreWhen.later && plantNeedsWater(plant, reminder, now)) {
-    return ChoreWhen.today;
-  }
-  return scheduled;
-}
-
-/// The day the chores screen should show this chore on.
-DateTime choreDisplayDue(GardenChore chore, DateTime now) {
-  if (choreDisplayWhen(chore.reminder, chore.plant, now) == ChoreWhen.today &&
-      choreWhen(chore.reminder.dueAt, now) == ChoreWhen.later) {
-    return DateTime(now.year, now.month, now.day);
-  }
-  return chore.reminder.dueAt;
 }
 
 /// One open reminder that still belongs to a plant in the garden.
@@ -107,7 +63,7 @@ GardenSchedule gardenScheduleFrom({
       continue;
     }
     final chore = GardenChore(reminder: reminder, plant: plant);
-    switch (choreDisplayWhen(reminder, plant, now)) {
+    switch (choreWhen(reminder.dueAt, now)) {
       case ChoreWhen.overdue:
         overdue.add(chore);
       case ChoreWhen.today:
@@ -142,7 +98,7 @@ final gardenScheduleProvider = Provider<AsyncValue<GardenSchedule>>((ref) {
       plants != null && (plants.isNotEmpty || !plantsAsync.hasError);
   if (remindersReady && plantsReady) {
     return AsyncValue.data(
-      gardenScheduleFrom(reminders: reminders, plants: plants, now: now),
+      gardenScheduleFrom(reminders: reminders!, plants: plants!, now: now),
     );
   }
 

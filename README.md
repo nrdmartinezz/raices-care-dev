@@ -8,6 +8,48 @@ Firebase project: `raices-care`
 
 Picking the work back up? Start with [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md).
 
+## Features
+
+The signed-in path is: find a plant, add it to the garden, see what to check, log the care, and come back to that history.
+
+### Accounts
+
+- Email and password sign-up and sign-in. A new password needs at least 8 characters, an uppercase letter, a lowercase letter, a number, and a special character. Signing in still accepts an existing shorter password.
+- Google sign-in. The first success creates the account and the profile. Apple sign-in is implemented and hidden until there is an Apple Developer account.
+- Password reset, a web-only "Remember me" session, and account settings for email, phone, and password.
+- Sign-out and in-app account deletion. Email verification is sent at sign-up and is not required to use the app.
+
+### The garden
+
+- Home, My Plants, Chores, and Wisdom, each with its own stack.
+- Add a catalog plant or a custom one. The form collects a nickname, a spot (indoor, balcony, or a yard), and whether it is in a container or in the ground. A planting date and notes are optional. Onboarding asks for a hardiness zone from a ZIP code and does not ask for GPS, soil pH, pot size, or plant age. The first plant can be skipped.
+- My Plants lists active plants and opens each one. A plant can be edited, archived, or deleted.
+
+### Care
+
+- Log watering, fertilizing, pruning, repotting, a pest check, harvest, and a general observation, with an optional note and a date.
+- A mistaken log is deleted and written again. Care events are not edited in place.
+- Chores shows the open schedule for today, tomorrow, the weekend, or everything. A reminder can be completed, skipped, or snoozed. Skipping does not write a watering log. Water reminders ask for a check, not an automatic watering.
+- Suggested intervals come from a species care profile when that profile exists. A custom plant does not receive invented species-specific advice.
+
+### Catalog and photos
+
+- Wisdom searches the shared catalog by common or scientific name. The shared species record stays separate from the person's plant.
+- Trefle supplies species data under CC-BY-4.0. The screen has to show the attribution string the search returns. Trefle has growth tolerances, not care instructions. Derived watering and feeding cadences record which fields they used. An empty basis is a default, not a reviewed recommendation.
+- The local Worker seed is three species: Monstera, basil, and tomato. That is a development sample, not the 20–40 reviewed launch catalog.
+- Plant photos and the profile avatar upload through the Worker into private R2. The Worker checks the token before it streams the bytes.
+
+## MVP notes
+
+These are the gaps that still sit between the screens above and a small store beta. Missing optional ideas (weather-adjusted watering, identification, a social feed, subscriptions) are out of scope.
+
+- **Notifications.** `flutter_local_notifications` is a dependency and is not called. The home and chores screens work without notification permission. Server push stays a dry run until `FCM_SERVICE_ACCOUNT_JSON` is set and `DRY_RUN_PUSH` is `"false"`. A reminder on a physical device has not been tested here. Daylight-saving and time-zone changes are not described for the gardener.
+- **Catalog.** Three sample profiles are not a reviewed launch set. Search against Trefle can return a plant whose care cadence is a default.
+- **Account deletion.** Deleting the profile wakes `onUserDeleted`, which removes that user's plants, care history, reminders, gardens, settings, and photo files. The Worker `DELETE /v1/me` path does the same for its rows and R2 objects, and the app calls it before the Auth user is removed. There is no privacy policy and no public page for a deletion request. Store policy still needs a separate review. The function has to be deployed for the Firestore cleanup to run.
+- **Apple on iOS.** The Apple button is off. Shipping Google sign-in on iOS requires Sign in with Apple before an App Store release.
+- **Connectivity.** Saves need a network connection. There is no offline queue, so a failed save has to be sent again by the gardener. The Worker accepts an idempotency key so a retried care log does not become a second event.
+- **Environments.** Development and production share the Firebase project `raices-care`. The planned `.dev` application id is not configured. `api.raices.care` is not routed. Do not run `wrangler deploy` or a remote D1 migration from this repo.
+
 ## App identifiers
 
 The Android `applicationId`, iOS bundle ID, and macOS bundle ID are all `care.raices.app`,
@@ -197,8 +239,7 @@ screen content has to pad itself clear of both: wrap it in `ShellScrollView` rat
 that by hand. The central add button is routed *outside* the shell, so it covers the nav and
 reads as a task you finish or abandon.
 
-Only Home is built. The other three render `PlaceholderView`, which also lists what each
-screen is meant to do.
+Home, My Plants, Chores, and Wisdom each have a screen. See [Features](#features).
 
 ## Firebase backend
 

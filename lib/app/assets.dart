@@ -96,7 +96,7 @@ abstract final class AppIcons {
   static const fieldEye = 'assets/icons/field_eye.svg';
   static const ctaArrow = 'assets/icons/cta_arrow.svg';
   static const socialApple = 'assets/icons/social_apple.svg';
-  static const socialGoogle = 'assets/icons/social_google.png';
+  static const socialGoogle = 'assets/icons/social_google.svg';
   static const footerLeaf = 'assets/icons/footer_leaf.svg';
 
   // Garden Chores hub.

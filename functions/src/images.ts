@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 
 import {
   DeleteObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -46,7 +47,38 @@ const PLANT_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const ENFORCE_APP_CHECK = false;
 const PUBLIC_INVOKER = "public";
 
-const imageSecrets = [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY];
+export const imageSecrets = [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY];
+
+/**
+ * Removes every object under `users/{uid}/`, including the avatar and plant
+ * photos. Used when the account itself is deleted.
+ */
+export async function deleteUserImages(uid: string): Promise<number> {
+  const client = r2Client();
+  const prefix = `users/${uid}/`;
+  let removed = 0;
+  let token: string | undefined;
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: R2_BUCKET,
+        Prefix: prefix,
+        ContinuationToken: token,
+      }),
+    );
+    for (const item of page.Contents ?? []) {
+      if (!item.Key?.startsWith(prefix)) {
+        continue;
+      }
+      await client.send(
+        new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: item.Key }),
+      );
+      removed += 1;
+    }
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  return removed;
+}
 
 function r2Client(): S3Client {
   return new S3Client({

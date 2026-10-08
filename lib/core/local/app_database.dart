@@ -73,6 +73,24 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// Drops this device's copy of the signed-in garden. Shared species stay.
+  Future<void> clearPersonalData() {
+    return transaction(() async {
+      await (delete(cachedDocuments)..where(
+            (row) => row.collection.isIn(const [
+              'plants',
+              'care_events',
+              'reminders',
+              'photos',
+              'tokens',
+              'gardens',
+            ]),
+          ))
+          .go();
+      await delete(pendingOperations).go();
+    });
+  }
+
   Future<void> removeDocument(String collection, String id) {
     return (delete(cachedDocuments)..where(
           (row) => row.collection.equals(collection) & row.id.equals(id),
