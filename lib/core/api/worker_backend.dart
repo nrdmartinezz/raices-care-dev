@@ -23,10 +23,10 @@ import 'authenticated_image.dart';
 class WorkerBackend {
   WorkerBackend({
     required this._client,
-    required AppDatabase database,
+    required this._database,
     required this._sync,
     required this._userId,
-  }) : _database = database;
+  });
 
   final ApiClient _client;
   final AppDatabase _database;

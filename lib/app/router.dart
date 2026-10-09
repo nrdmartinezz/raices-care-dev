@@ -15,6 +15,7 @@ import '../features/plants/presentation/my_plants_screen.dart';
 import '../features/plants/presentation/plant_detail_screen.dart';
 import '../features/profile/presentation/account_settings_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
+import '../features/profile/presentation/support_screen.dart';
 import '../features/wisdom/presentation/species_article_screen.dart';
 import '../features/wisdom/presentation/wisdom_screen.dart';
 import 'shell/app_shell.dart';
@@ -86,10 +87,17 @@ abstract final class AccountSettingsRoute {
   static const path = 'settings';
 }
 
-/// Profile and account settings sit beside the tabs, so opening them does not
-/// change which tab is highlighted.
+abstract final class SupportRoute {
+  static const name = 'support';
+  static const path = 'support';
+}
+
+/// Profile, settings, and support sit beside the tabs, so opening them does
+/// not change which tab is highlighted.
 bool isAccountRoute(String? name) =>
-    name == ProfileRoute.name || name == AccountSettingsRoute.name;
+    name == ProfileRoute.name ||
+    name == AccountSettingsRoute.name ||
+    name == SupportRoute.name;
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
@@ -252,6 +260,15 @@ final routerProvider = Provider<GoRouter>((ref) {
                   key: state.pageKey,
                   from: _SlideFrom.end,
                   child: const AccountSettingsScreen(),
+                ),
+              ),
+              GoRoute(
+                path: SupportRoute.path,
+                name: SupportRoute.name,
+                pageBuilder: (context, state) => _slidePage(
+                  key: state.pageKey,
+                  from: _SlideFrom.end,
+                  child: const SupportScreen(),
                 ),
               ),
             ],

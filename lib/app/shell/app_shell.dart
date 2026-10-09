@@ -162,10 +162,11 @@ class AppShell extends ConsumerWidget {
     if (routeName == ProfileRoute.name) {
       return const AppHeader(showBell: true);
     }
-    if (routeName == AccountSettingsRoute.name) {
+    if (routeName == AccountSettingsRoute.name ||
+        routeName == SupportRoute.name) {
       return FlowHeader(
         eyebrow: 'YOUR ACCOUNT',
-        title: 'Settings',
+        title: routeName == SupportRoute.name ? 'Support' : 'Settings',
         onBack: () => context.canPop()
             ? context.pop()
             : context.goNamed(ProfileRoute.name),

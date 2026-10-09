@@ -94,6 +94,11 @@ abstract final class AppIcons {
   static const accountChevron = 'assets/icons/account_chevron.svg';
   static const accountLock = 'assets/icons/account_lock.svg';
   static const accountEyeOff = 'assets/icons/account_eye_off.svg';
+  static const supportHelp = 'assets/icons/support_help.svg';
+  static const supportBug = 'assets/icons/support_bug.svg';
+  static const supportHeart = 'assets/icons/support_heart.svg';
+  static const supportExternal = 'assets/icons/support_external.svg';
+  static const supportSprout = 'assets/icons/support_sprout.svg';
 
   static const authBadge = 'assets/icons/auth_badge.svg';
   static const fieldEmail = 'assets/icons/field_email.svg';

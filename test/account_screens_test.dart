@@ -114,6 +114,42 @@ void main() {
     expect(find.text('Home'), findsOneWidget);
   });
 
+  testWidgets('profile opens support with bug reports and Patreon', (
+    tester,
+  ) async {
+    _usePhoneSurface(tester);
+    await _openProfile(tester);
+
+    expect(
+      find.text('Report a bug or support the app on Patreon'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Opens a separate support screen with bug reporting and Patreon '
+        'support options.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(find.text('Support'));
+    await tester.tap(find.text('Support'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('YOUR ACCOUNT'), findsOneWidget);
+    expect(find.text('Support'), findsWidgets);
+    expect(
+      find.text(
+        'A little help goes a long way. Let’s keep Raíces growing together.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Report a bug'), findsNWidgets(2));
+    expect(find.text('Support on Patreon'), findsNWidgets(2));
+    expect(find.text('Thank you for helping Raíces grow.'), findsOneWidget);
+    expect(find.text('Home'), findsOneWidget);
+  });
+
   testWidgets('a mismatched password is rejected and sign out is called', (
     tester,
   ) async {

@@ -126,6 +126,14 @@ class _ProfileBody extends StatelessWidget {
             'You can add your email and phone in Settings.',
             style: AppText.caption.copyWith(color: AppColors.body),
           ),
+          const SizedBox(height: AppSizes.sectionGap),
+          const _SupportEntry(),
+          const SizedBox(height: 10),
+          Text(
+            'Opens a separate support screen with bug reporting and Patreon '
+            'support options.',
+            style: AppText.caption.copyWith(color: AppColors.body),
+          ),
         ],
       ),
     );
@@ -418,6 +426,51 @@ class _SettingsEntry extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       'Update email, phone or password',
+                      style: AppText.body.copyWith(color: AppColors.body),
+                    ),
+                  ],
+                ),
+              ),
+              SvgPicture.asset(AppIcons.accountChevron),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportEntry extends StatelessWidget {
+  const _SupportEntry();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Support',
+      child: GestureDetector(
+        onTap: () => context.pushNamed(SupportRoute.name),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: accountCardDecoration(bordered: true),
+          child: Row(
+            children: [
+              const AccountIconTile(icon: AppIcons.supportHelp, size: 40),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Support',
+                      style: AppText.subtitleBold.copyWith(
+                        color: AppColors.terracotta,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Report a bug or support the app on Patreon',
                       style: AppText.body.copyWith(color: AppColors.body),
                     ),
                   ],

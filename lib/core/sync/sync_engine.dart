@@ -14,10 +14,9 @@ import '../local/app_database.dart';
 class SyncEngine {
   SyncEngine({
     required this._database,
-    required ApiClient client,
+    required this._client,
     Connectivity? connectivity,
-  }) : _client = client,
-       _connectivity = connectivity ?? Connectivity();
+  }) : _connectivity = connectivity ?? Connectivity();
 
   final AppDatabase _database;
   final ApiClient _client;
