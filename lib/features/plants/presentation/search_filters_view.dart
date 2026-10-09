@@ -62,13 +62,15 @@ class SearchFilterButton extends StatelessWidget {
                           color: AppColors.terracotta,
                           borderRadius: BorderRadius.all(Radius.circular(8)),
                         ),
-                        child: Text(
-                          '$count',
-                          style: AppText.body.copyWith(
-                            color: AppColors.surface,
-                            fontSize: 10,
-                            height: 1,
-                            fontWeight: FontWeight.w700,
+                        child: ExcludeSemantics(
+                          child: Text(
+                            '$count',
+                            style: AppText.body.copyWith(
+                              color: AppColors.surface,
+                              fontSize: 10,
+                              height: 1,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
