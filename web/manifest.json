@@ -1,11 +1,11 @@
 {
-    "name": "raices",
-    "short_name": "raices",
+    "name": "Raíces",
+    "short_name": "Raíces",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#3A6758",
     "theme_color": "#3A6758",
-    "description": "A new Flutter project.",
+    "description": "Care for the plants in your garden. Add each one, see what needs attention, and keep a record of how you tend them.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
