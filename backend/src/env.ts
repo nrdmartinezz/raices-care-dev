@@ -7,6 +7,8 @@ export interface Env {
   APP_CHECK_ENFORCE?: string;
   ALLOWED_ORIGINS?: string;
   FCM_SERVICE_ACCOUNT_JSON?: string;
+  /** Set in `.dev.vars` locally, or with `wrangler secret put` when deployed. */
+  TREFLE_API_TOKEN?: string;
 }
 
 export type AppVariables = {

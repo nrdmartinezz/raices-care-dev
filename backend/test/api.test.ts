@@ -424,4 +424,38 @@ describe("species search", () => {
     const edibleBody = (await edible.json()) as { results: { id: string }[] };
     expect(edibleBody.results).toEqual([]);
   });
+
+  it("finds a stored species from a garden common name", async () => {
+    const ts = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO species (
+        id, scientific_name, common_names_json, plant_groups_json, toxicity_json,
+        source, source_id, created_at, updated_at
+      ) VALUES ('ocimum-basilicum', 'Ocimum basilicum', '[]', '["herb"]', '{}', 'trefle', 'ocimum-basilicum', ?, ?)`,
+    )
+      .bind(ts, ts)
+      .run();
+
+    const listed = await call("/v1/species?q=albahaca", dev("searcher"));
+    expect(listed.status).toBe(200);
+    const body = (await listed.json()) as {
+      results: { id: string; trefleSlug: string | null }[];
+    };
+    expect(body.results.map((item) => item.id)).toContain("ocimum-basilicum");
+    expect(body.results.find((item) => item.id === "ocimum-basilicum")?.trefleSlug).toBe(
+      "ocimum-basilicum",
+    );
+  });
+
+  it("refuses to fetch an unknown species without a catalog token", async () => {
+    const response = await call(
+      "/v1/species/resolve",
+      dev("searcher", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ trefleSlug: "no-such-species" }),
+      }),
+    );
+    expect(response.status).toBe(503);
+  });
 });

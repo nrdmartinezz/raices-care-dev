@@ -39,6 +39,13 @@
 	<string>392022672087-seuebl0blkci7gcsjlbad4hka2t30pda.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Raíces reaches the garden catalog on your local network during development.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Raíces uses the camera for an optional profile photo or plant photo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

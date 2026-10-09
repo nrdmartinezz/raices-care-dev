@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
 
-/// Set with `--dart-define=API_BASE_URL=...`. Empty keeps the Firestore repositories.
+/// Set with `--dart-define=API_BASE_URL=...`.
+///
+/// A debug build with no define uses the local Worker. Release builds still
+/// require a hosted URL, and an empty release URL keeps the Firestore path.
 const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
-bool get usesWorkerApi => apiBaseUrl.isNotEmpty;
+bool get usesWorkerApi => apiBaseUrl.isNotEmpty || kDebugMode;
 
 /// Release builds must name a hosted API. Debug may use localhost, and the
 /// Android emulator reaches the host at 10.0.2.2.
@@ -25,20 +28,27 @@ Uri resolveApiBaseUrl(String raw, {required bool release}) {
   return uri;
 }
 
-Uri get configuredApiBase =>
-    resolveApiBaseUrl(apiBaseUrl, release: kReleaseMode);
+Uri get configuredApiBase {
+  if (apiBaseUrl.isNotEmpty) {
+    return resolveApiBaseUrl(apiBaseUrl, release: kReleaseMode);
+  }
+  if (kDebugMode) return localWorkerBase();
+  throw StateError('API_BASE_URL is not set.');
+}
 
-/// Where sowing calendars are loaded from.
-///
-/// Planting schedules live on the Worker. A debug build that has not set
-/// [apiBaseUrl] still asks the local Worker, so the calendar can show while
-/// the rest of the app stays on Firestore. Release builds keep requiring the
-/// hosted URL.
-Uri? get plantingApiBase {
-  if (apiBaseUrl.isNotEmpty) return configuredApiBase;
-  if (!kDebugMode) return null;
+/// The Worker on this machine. Android emulator traffic uses 10.0.2.2.
+Uri localWorkerBase() {
   final host = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
       ? '10.0.2.2'
       : '127.0.0.1';
   return Uri.parse('http://$host:8787');
+}
+
+/// Where sowing calendars are loaded from.
+///
+/// Debug builds use [configuredApiBase]. A release build with no hosted URL
+/// has no calendar API.
+Uri? get plantingApiBase {
+  if (apiBaseUrl.isEmpty && !kDebugMode) return null;
+  return configuredApiBase;
 }

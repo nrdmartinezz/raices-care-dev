@@ -391,10 +391,7 @@ class WorkerBackend {
     return _client.sendJson(
       'PUT',
       '/v1/me',
-      body: {
-        'displayName': ?displayName,
-        'email': ?email,
-      },
+      body: {'displayName': ?displayName, 'email': ?email},
     );
   }
 
@@ -497,7 +494,7 @@ class WorkerBackend {
     );
     final results = json['results'];
     return SpeciesSearchResult(
-      attribution: 'Raíces catalog',
+      attribution: json['attribution'] as String? ?? 'Raíces catalog',
       candidates: results is List
           ? [
               for (final item in results)
@@ -510,7 +507,12 @@ class WorkerBackend {
                             (item['commonNames'] as List).isNotEmpty)
                         ? (item['commonNames'] as List).first as String?
                         : null,
+                    family: item['family'] as String?,
                     imageUrl: item['imageUrl'] as String?,
+                    trefleSlug: item['trefleSlug'] as String?,
+                    dataCompleteness: item['dataCompleteness'] is num
+                        ? (item['dataCompleteness'] as num).toInt()
+                        : null,
                   ),
             ]
           : const [],
@@ -521,10 +523,7 @@ class WorkerBackend {
     final json = await _client.sendJson(
       'POST',
       '/v1/species/resolve',
-      body: {
-        'speciesId': ?speciesId,
-        'trefleSlug': ?trefleSlug,
-      },
+      body: {'speciesId': ?speciesId, 'trefleSlug': ?trefleSlug},
     );
     final id = json['id'] as String?;
     if (id == null || id.isEmpty) {
