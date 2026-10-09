@@ -154,7 +154,7 @@ meRoutes.delete("/v1/me/devices", async (c) => {
   return c.body(null, 204);
 });
 
-meRoutes.put("/v1/me/avatar", async (c) => {
+meRoutes.on(["POST", "PUT"], "/v1/me/avatar", async (c) => {
   const userId = c.get("userId");
   await ensureUser(c.env.DB, userId);
   const bytes = await readImageBody(c.req.raw);

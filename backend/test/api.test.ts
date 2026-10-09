@@ -370,6 +370,24 @@ describe("photos", () => {
 });
 
 describe("profile photo", () => {
+  it("stores the JPEG the app posts", async () => {
+    const development = { ...env, ENVIRONMENT: "development" };
+    const uploaded = await call(
+      "/v1/me/avatar",
+      dev("avatar-upload", {
+        method: "POST",
+        headers: { "content-type": "image/jpeg" },
+        body: jpeg,
+      }),
+      development,
+    );
+    expect(uploaded.status).toBe(200);
+
+    const streamed = await call("/v1/me/avatar", dev("avatar-upload"), development);
+    expect(streamed.status).toBe(200);
+    expect(new Uint8Array(await streamed.arrayBuffer())).toEqual(jpeg);
+  });
+
   it("serves an avatar saved before the database pointer existed", async () => {
     const key = "users/legacy-avatar/profile/avatar.jpg";
     await env.IMAGES.put(key, jpeg, { httpMetadata: { contentType: "image/jpeg" } });

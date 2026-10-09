@@ -7,10 +7,13 @@ import 'api_client.dart';
 
 /// Loads a private Worker image with the Firebase ID token.
 class AuthenticatedImage extends ImageProvider<AuthenticatedImage> {
-  const AuthenticatedImage(this.client, this.path);
+  const AuthenticatedImage(this.client, this.path, {this.version = 0});
 
   final ApiClient client;
   final String path;
+
+  /// Changes after a replacement so a fixed path such as the avatar reloads.
+  final int version;
 
   @override
   Future<AuthenticatedImage> obtainKey(ImageConfiguration configuration) {
@@ -38,10 +41,12 @@ class AuthenticatedImage extends ImageProvider<AuthenticatedImage> {
 
   @override
   bool operator ==(Object other) =>
-      other is AuthenticatedImage && other.path == path;
+      other is AuthenticatedImage &&
+      other.path == path &&
+      other.version == version;
 
   @override
-  int get hashCode => path.hashCode;
+  int get hashCode => Object.hash(path, version);
 }
 
 const workerPhotoPrefix = 'worker-photo:';

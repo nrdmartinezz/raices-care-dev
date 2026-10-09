@@ -217,15 +217,24 @@ class WorkerAvatarRepository extends AvatarRepository {
     required super.functions,
     required super.userId,
     required this.backend,
+    this.onUploaded,
   });
 
   final WorkerBackend backend;
+  final void Function(String storagePath)? onUploaded;
 
   @override
   Future<String> uploadAvatar({
     required Uint8List bytes,
     required String contentType,
-  }) => backend.uploadAvatar(bytes: bytes, contentType: contentType);
+  }) async {
+    final path = await backend.uploadAvatar(
+      bytes: bytes,
+      contentType: contentType,
+    );
+    onUploaded?.call(path);
+    return path;
+  }
 }
 
 class WorkerUserSettingsRepository extends UserSettingsRepository {

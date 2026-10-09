@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_providers.dart';
 import '../../core/api/authenticated_image.dart';
 import '../../features/onboarding/data/avatar_repository.dart';
+import '../../features/photos/data/image_revision.dart';
 import '../assets.dart';
 
 /// The signed-in gardener's photo, or the bundled placeholder.
@@ -28,9 +29,14 @@ class UserAvatar extends ConsumerWidget {
 
     final url = ref.watch(avatarUrlProvider(stored));
     if (url == workerAvatarPath) {
+      final version = ref.watch(imageRevisionProvider)[workerAvatarPath] ?? 0;
       return ClipOval(
         child: Image(
-          image: AuthenticatedImage(ref.watch(apiClientProvider), '/v1/me/avatar'),
+          image: AuthenticatedImage(
+            ref.watch(apiClientProvider),
+            '/v1/me/avatar',
+            version: version,
+          ),
           width: size,
           height: size,
           fit: BoxFit.cover,

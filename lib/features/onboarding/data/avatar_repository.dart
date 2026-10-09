@@ -63,6 +63,7 @@ final avatarRepositoryProvider = Provider<AvatarRepository>((ref) {
       functions: functions,
       userId: userId,
       backend: ref.watch(workerBackendProvider),
+      onUploaded: (path) => ref.read(imageRevisionProvider.notifier).bump(path),
     );
   }
   return AvatarRepository(
