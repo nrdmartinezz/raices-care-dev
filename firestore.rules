@@ -97,6 +97,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Learned common-name → scientific-name pairs. The search callable writes
+    // these with the Admin SDK; clients never read or write them.
+    match /vernacularAliases/{aliasId} {
+      allow read, write: if false;
+    }
+
     // ------------------------------------------------------------ user-owned
 
     match /users/{userId} {

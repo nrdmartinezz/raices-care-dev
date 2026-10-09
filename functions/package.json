@@ -8,7 +8,8 @@
     "node": "22"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').copyFileSync('src/catalog/vernacular_aliases.json','lib/catalog/vernacular_aliases.json')\"",
+    "test": "npm run build && node --test test/*.cjs",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions,firestore,auth",
     "seed": "npm run build && node lib/scripts/seed_catalog.js",

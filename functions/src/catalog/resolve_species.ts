@@ -18,9 +18,17 @@ import {
   TREFLE_API_TOKEN,
   TREFLE_ATTRIBUTION,
   TrefleError,
+  TrefleSummary,
   fetchTrefleSpecies,
   searchTrefleSpecies,
+  type SpeciesSearchFilters,
 } from "./trefle";
+import {
+  fetchInaturalistScientificName,
+  lookupGardenName,
+  mergeBySlug,
+  normalizeVernacular,
+} from "./vernacular";
 
 /** Re-fetch a cached species once its data is this old. */
 const CACHE_TTL_DAYS = 90;
@@ -108,12 +116,95 @@ function toHttpsError(error: unknown): HttpsError {
   return new HttpsError("internal", "Could not reach the plant catalog.");
 }
 
+/** A learned vernacular key is a Firestore id, so it cannot contain a slash. */
+function aliasDocId(key: string): boolean {
+  return key.length >= 2 && key.length <= 700 && !key.includes("/");
+}
+
+async function cachedScientificName(key: string): Promise<string | null> {
+  if (!aliasDocId(key)) {
+    return null;
+  }
+  try {
+    const snap = await db.doc(`vernacularAliases/${key}`).get();
+    const name = snap.get("scientificName");
+    return typeof name === "string" && name.trim() ? name.trim() : null;
+  } catch (error) {
+    logger.warn("Vernacular cache read failed", error);
+    return null;
+  }
+}
+
+async function cacheScientificName(
+  key: string,
+  scientificName: string,
+): Promise<void> {
+  if (!aliasDocId(key)) {
+    return;
+  }
+  try {
+    await db.doc(`vernacularAliases/${key}`).set({
+      normalizedName: key,
+      scientificName,
+      source: "inaturalist",
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  } catch (error) {
+    logger.warn("Vernacular cache write failed", error);
+  }
+}
+
 /**
- * Searches the catalog without writing anything.
+ * Shipped garden list, then the Firestore cache, then iNaturalist.
+ * The first scientific name wins. A total miss returns null.
+ */
+async function resolveScientificName(query: string): Promise<{
+  scientificName: string;
+  matchedName: string;
+} | null> {
+  const key = normalizeVernacular(query);
+  const matchedName = query.trim();
+  const listed = lookupGardenName(key);
+  if (listed) {
+    return { scientificName: listed, matchedName };
+  }
+
+  const cached = await cachedScientificName(key);
+  if (cached) {
+    return { scientificName: cached, matchedName };
+  }
+
+  const learned = await fetchInaturalistScientificName(query);
+  if (!learned) {
+    return null;
+  }
+  await cacheScientificName(key, learned);
+  return { scientificName: learned, matchedName };
+}
+
+async function attemptTrefleSearch(
+  query: string,
+  token: string,
+  filters: SpeciesSearchFilters,
+): Promise<{ ok: true; matches: TrefleSummary[] } | { ok: false; error: unknown }> {
+  try {
+    return {
+      ok: true,
+      matches: await searchTrefleSpecies(query, token, filters),
+    };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
+/**
+ * Searches the catalog and returns summaries only.
  *
- * Calls Trefle `GET /plants/search` and prefers common-name matches.
- * Returns summaries only — that endpoint carries no growth data — so the
- * client shows candidates and then calls `resolveSpecies` for the pick.
+ * A typed common name is resolved to a scientific name first, then Trefle
+ * `GET /plants/search` runs with that name. The original text is searched
+ * too when it is not already the scientific name. Learned names are cached
+ * in `vernacularAliases`. The client shows candidates and then calls
+ * `resolveSpecies` for the pick.
  */
 export const searchSpeciesCatalog = onCall(
   {
@@ -135,16 +226,49 @@ export const searchSpeciesCatalog = onCall(
       );
     }
 
+    const filters: SpeciesSearchFilters = {
+      ranks: allowedList(request.data?.ranks, SEARCH_RANKS),
+      families: allowedList(request.data?.families, SEARCH_FAMILIES),
+      edible: request.data?.edible === true,
+      vegetable: request.data?.vegetable === true,
+    };
+
     try {
-      const matches = await searchTrefleSpecies(
-        query,
-        TREFLE_API_TOKEN.value(),
-        {
-          ranks: allowedList(request.data?.ranks, SEARCH_RANKS),
-          families: allowedList(request.data?.families, SEARCH_FAMILIES),
-          edible: request.data?.edible === true,
-          vegetable: request.data?.vegetable === true,
-        },
+      const resolved = await resolveScientificName(query);
+      const scientific = resolved?.scientificName ?? null;
+      const searchScientific =
+        scientific !== null &&
+        normalizeVernacular(scientific) !== normalizeVernacular(query);
+      const label =
+        resolved &&
+        normalizeVernacular(resolved.matchedName) !==
+          normalizeVernacular(resolved.scientificName)
+          ? resolved.matchedName
+          : null;
+
+      const token = TREFLE_API_TOKEN.value();
+      const [aliasOutcome, directOutcome] = await Promise.all([
+        searchScientific
+          ? attemptTrefleSearch(scientific, token, filters)
+          : Promise.resolve({ ok: true as const, matches: [] as TrefleSummary[] }),
+        attemptTrefleSearch(query, token, filters),
+      ]);
+
+      const failures: unknown[] = [];
+      if (searchScientific && !aliasOutcome.ok) {
+        failures.push(aliasOutcome.error);
+      }
+      if (!directOutcome.ok) {
+        failures.push(directOutcome.error);
+      }
+      if (failures.length === (searchScientific ? 2 : 1)) {
+        throw failures[0];
+      }
+
+      const matches = mergeBySlug(
+        aliasOutcome.ok ? aliasOutcome.matches : [],
+        directOutcome.ok ? directOutcome.matches : [],
+        searchScientific ? label : null,
       );
       return {
         attribution: TREFLE_ATTRIBUTION.attributionText,
