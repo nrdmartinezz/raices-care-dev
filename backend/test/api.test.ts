@@ -368,3 +368,60 @@ describe("photos", () => {
     expect((await call(`/v1/photos/${created.id}`, dev("photo-user"))).status).toBe(404);
   });
 });
+
+describe("species search", () => {
+  it("returns the catalog image with each result", async () => {
+    const ts = Date.now();
+    await env.IMAGES.put("species/rosemary/cover.jpg", jpeg, {
+      httpMetadata: { contentType: "image/jpeg" },
+    });
+    await env.DB.prepare(
+      `INSERT INTO species (
+        id, scientific_name, common_names_json, plant_groups_json, toxicity_json,
+        image_object_key, created_at, updated_at
+      ) VALUES ('rosemary', 'Salvia rosmarinus', '["rosemary"]', '["herb"]', '{}', ?, ?, ?)`,
+    )
+      .bind("species/rosemary/cover.jpg", ts, ts)
+      .run();
+
+    const listed = await call("/v1/species?q=rosemary", dev("searcher"));
+    expect(listed.status).toBe(200);
+    const body = (await listed.json()) as { results: { id: string; imageUrl: string | null }[] };
+    expect(body.results.map((item) => item.id)).toContain("rosemary");
+    expect(body.results.find((item) => item.id === "rosemary")?.imageUrl).toBe(
+      "/v1/species/rosemary/image",
+    );
+
+    const image = await call("/v1/species/rosemary/image", dev("searcher"));
+    expect(image.status).toBe(200);
+    expect(image.headers.get("content-type")).toBe("image/jpeg");
+    expect(new Uint8Array(await image.arrayBuffer())).toEqual(jpeg);
+    expect((await call("/v1/species/missing/image", dev("searcher"))).status).toBe(404);
+  });
+
+  it("keeps only species whose plant groups match edible and vegetable", async () => {
+    const ts = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO species (
+        id, scientific_name, common_names_json, plant_groups_json, toxicity_json,
+        created_at, updated_at
+      ) VALUES
+        ('tomato', 'Solanum lycopersicum', '["tomato"]', '["vegetable"]', '{}', ?, ?),
+        ('basil-herb', 'Ocimum basilicum', '["basil"]', '["herb"]', '{}', ?, ?)`,
+    )
+      .bind(ts, ts, ts, ts)
+      .run();
+
+    const vegetable = await call(
+      "/v1/species?q=tomato&vegetable=true&rank=species&family=Solanaceae",
+      dev("searcher"),
+    );
+    expect(vegetable.status).toBe(200);
+    const vegetableBody = (await vegetable.json()) as { results: { id: string }[] };
+    expect(vegetableBody.results.map((item) => item.id)).toEqual(["tomato"]);
+
+    const edible = await call("/v1/species?q=tomato&edible=true", dev("searcher"));
+    const edibleBody = (await edible.json()) as { results: { id: string }[] };
+    expect(edibleBody.results).toEqual([]);
+  });
+});

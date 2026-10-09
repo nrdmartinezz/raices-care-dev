@@ -216,7 +216,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
+  final _plantFlow = GlobalKey<AddPlantFlowState>();
+
   void _back() {
+    if (_step == 3 && (_plantFlow.currentState?.goBack() ?? false)) {
+      return;
+    }
     setState(() {
       _error = null;
       _step -= 1;
@@ -260,6 +265,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 Expanded(
                   child: onPlant
                       ? AddPlantFlow(
+                          key: _plantFlow,
                           explain: _explain,
                           eyebrow: 'FIRST PLANT',
                           title: 'Add your first plant',

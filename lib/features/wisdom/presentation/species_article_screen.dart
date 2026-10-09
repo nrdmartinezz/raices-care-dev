@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/assets.dart';
+import '../../../app/router.dart';
 import '../../../app/shell/app_shell.dart';
 import '../../../app/theme.dart';
 import '../../../core/errors/app_exception.dart';
@@ -13,6 +17,7 @@ import '../../plants/data/species_repository.dart';
 import '../../plants/domain/care_profile.dart';
 import '../../plants/domain/species.dart';
 import '../../plants/presentation/care_labels.dart';
+import '../../plants/presentation/catalog_image.dart';
 
 /// A catalog species: names, growth facts, care tasks, and the licence credit.
 class SpeciesArticleScreen extends ConsumerStatefulWidget {
@@ -82,7 +87,8 @@ class _SpeciesArticleScreenState extends ConsumerState<SpeciesArticleScreen> {
     }
 
     final speciesAsync = ref.watch(speciesProvider(id));
-    final calendar = ref.watch(sowingForSpeciesProvider(id)).value;
+    final calendarAsync = ref.watch(sowingForSpeciesProvider(id));
+    final garden = ref.watch(gardenFrostProvider).value;
     final profiles = ref.watch(careProfilesProvider(id)).value;
     final sources = ref.watch(speciesSourcesProvider(id)).value;
     final unit =
@@ -113,12 +119,45 @@ class _SpeciesArticleScreenState extends ConsumerState<SpeciesArticleScreen> {
             profiles: profiles ?? const [],
             sources: sources ?? const [],
             unit: unit,
-            calendar: calendar,
+            calendar: calendarAsync.value,
+            plantingNote: _plantingNote(calendarAsync, garden),
+            onAddToGarden: () => _addToGarden(species),
           );
         },
       ),
     );
   }
+
+  void _addToGarden(Species species) {
+    context.pushNamed(
+      AddPlantRoute.name,
+      extra: SpeciesCandidate(
+        speciesId: species.id,
+        scientificName: species.scientificName,
+        commonName: species.commonName,
+        family: species.family,
+        imageUrl: species.imageUrl,
+        trefleSlug: species.externalIds.trefleSlug,
+      ),
+    );
+  }
+}
+
+/// Why the sowing dates are missing, once the lookup has finished.
+String? _plantingNote(
+  AsyncValue<SowingCalendar?> calendar,
+  GardenFrost? garden,
+) {
+  final loaded = calendar.value;
+  if (loaded != null && loaded.hasWindows) return null;
+  if (calendar.isLoading && !calendar.hasValue) return null;
+  return switch (garden) {
+    null ||
+    GardenFrostMissingZip() => 'Finish garden setup to see the frost calendar.',
+    GardenFrostUnavailable() =>
+      'The frost calendar is not available for this garden.',
+    GardenFrostReady() => 'No sowing calendar is published for this plant yet.',
+  };
 }
 
 class _Article extends StatelessWidget {
@@ -128,6 +167,8 @@ class _Article extends StatelessWidget {
     required this.sources,
     required this.unit,
     required this.calendar,
+    required this.plantingNote,
+    required this.onAddToGarden,
   });
 
   final Species species;
@@ -135,6 +176,8 @@ class _Article extends StatelessWidget {
   final List<SpeciesSource> sources;
   final TemperatureUnit unit;
   final SowingCalendar? calendar;
+  final String? plantingNote;
+  final VoidCallback onAddToGarden;
 
   @override
   Widget build(BuildContext context) {
@@ -153,12 +196,7 @@ class _Article extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppSizes.cardRadius),
             child: AspectRatio(
               aspectRatio: 4 / 3,
-              child: Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    const ColoredBox(color: AppColors.surfaceBlush),
-              ),
+              child: CatalogImage(url: url),
             ),
           ),
         const SizedBox(height: AppSizes.sectionGap),
@@ -181,6 +219,8 @@ class _Article extends StatelessWidget {
             style: AppText.bodyLarge.copyWith(color: AppColors.body),
           ),
         ],
+        const SizedBox(height: AppSizes.sectionGap),
+        _AddToGardenButton(onPressed: onAddToGarden),
         if (facts.isNotEmpty) ...[
           const SizedBox(height: AppSizes.sectionGap),
           Text('Growing', style: AppText.title.copyWith(color: AppColors.ink)),
@@ -203,6 +243,12 @@ class _Article extends StatelessWidget {
         if (calendar != null && calendar!.hasWindows) ...[
           const SizedBox(height: 12),
           SowingCalendarSection(calendar: calendar!),
+        ] else if (plantingNote != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            plantingNote!,
+            style: AppText.body.copyWith(color: AppColors.body),
+          ),
         ],
         const SizedBox(height: 10),
         if (tasks.isEmpty)
@@ -220,6 +266,45 @@ class _Article extends StatelessWidget {
           Text(credit, style: AppText.caption.copyWith(color: AppColors.muted)),
         ],
       ],
+    );
+  }
+}
+
+class _AddToGardenButton extends StatelessWidget {
+  const _AddToGardenButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Add to garden',
+      child: GestureDetector(
+        onTap: onPressed,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: double.infinity,
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.terracotta,
+            borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+            boxShadow: AppShadows.card,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset(AppIcons.ctaSprout, width: 18, height: 18),
+              const SizedBox(width: 8),
+              Text(
+                'Add to garden',
+                style: AppText.title.copyWith(color: AppColors.surface),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

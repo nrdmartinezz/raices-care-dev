@@ -14,6 +14,9 @@ import '../data/recent_searches.dart';
 import '../data/species_repository.dart';
 import '../domain/garden_spot.dart';
 import '../domain/plant.dart';
+import '../domain/search_filters.dart';
+import 'catalog_image.dart';
+import 'search_filters_view.dart';
 
 /// The two steps of adding a plant: choose a species, then set it up.
 ///
@@ -27,9 +30,11 @@ class AddPlantFlow extends ConsumerStatefulWidget {
     this.eyebrow = 'ADD TO YOUR LIVING CATALOG',
     this.title = 'Find your next green companion',
     this.showProgress = true,
+    this.preset,
     this.onCreated,
     this.onSkip,
     this.onStepChanged,
+    this.onCanPop,
   });
 
   /// Beginners get one sentence on each choice.
@@ -39,6 +44,10 @@ class AddPlantFlow extends ConsumerStatefulWidget {
 
   /// False where the host already shows its own steps, as onboarding does.
   final bool showProgress;
+
+  /// A species already chosen, such as from a Wisdom article. Setup opens
+  /// immediately and back leaves instead of returning to search.
+  final SpeciesCandidate? preset;
 
   /// After the plant document is written, with the new plant's id. Onboarding
   /// finishes the profile here; the add-plant route opens the plant.
@@ -50,11 +59,15 @@ class AddPlantFlow extends ConsumerStatefulWidget {
   /// One-based step, so the host can title its header.
   final ValueChanged<int>? onStepChanged;
 
+  /// False while filters are open, so the host keeps the system back gesture
+  /// inside the flow.
+  final ValueChanged<bool>? onCanPop;
+
   @override
   ConsumerState<AddPlantFlow> createState() => AddPlantFlowState();
 }
 
-enum _Phase { search, setup }
+enum _Phase { search, filters, setup }
 
 class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
   static const _uuid = Uuid();
@@ -73,9 +86,20 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
   String? _coverPath;
   List<SpeciesCandidate> _results = const [];
   SpeciesCandidate? _selected;
+  SearchFilters _filters = const SearchFilters();
   PickedGardenPhoto? _photo;
   GardenSpot? _garden;
   PlantAgeStage? _stage;
+
+  @override
+  void initState() {
+    super.initState();
+    final preset = widget.preset;
+    if (preset == null || preset.speciesId.isEmpty) return;
+    _selected = preset;
+    _speciesId = preset.speciesId;
+    _phase = _Phase.setup;
+  }
 
   @override
   void dispose() {
@@ -85,6 +109,11 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
 
   /// True when the flow handled the back gesture itself.
   bool goBack() {
+    if (_phase == _Phase.filters && !_busy) {
+      _setPhase(_Phase.search);
+      return true;
+    }
+    if (widget.preset != null) return false;
     if (_phase == _Phase.setup && !_busy) {
       _toSearch();
       return true;
@@ -94,7 +123,8 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
 
   void _setPhase(_Phase phase) {
     setState(() => _phase = phase);
-    widget.onStepChanged?.call(phase == _Phase.search ? 1 : 2);
+    widget.onStepChanged?.call(phase == _Phase.setup ? 2 : 1);
+    widget.onCanPop?.call(widget.preset != null || phase == _Phase.search);
   }
 
   void _toSearch() {
@@ -117,7 +147,9 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
       _error = null;
     });
     try {
-      final result = await ref.read(speciesRepositoryProvider).search(query);
+      final result = await ref
+          .read(speciesRepositoryProvider)
+          .search(query, filters: _filters);
       if (!mounted) {
         return;
       }
@@ -313,8 +345,20 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
     }
   }
 
+  void _applyFilters(SearchFilters filters) {
+    _filters = filters;
+    _setPhase(_Phase.search);
+    if (_query.text.trim().length >= 2) {
+      _search();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_phase == _Phase.filters) {
+      return SearchFiltersView(filters: _filters, onApply: _applyFilters);
+    }
+
     final pinned = _phase == _Phase.search ? _selected : null;
 
     return Column(
@@ -402,11 +446,22 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
           style: AppText.bodyLarge.copyWith(color: AppColors.body),
         ),
         const SizedBox(height: AppSizes.sectionGap),
-        _SearchField(
-          controller: _query,
-          enabled: !_busy,
-          onSubmitted: () => _search(),
-          onClear: _clearQuery,
+        Row(
+          children: [
+            Expanded(
+              child: _SearchField(
+                controller: _query,
+                enabled: !_busy,
+                onSubmitted: () => _search(),
+                onClear: _clearQuery,
+              ),
+            ),
+            const SizedBox(width: 16),
+            SearchFilterButton(
+              count: _filters.count,
+              onPressed: _busy ? null : () => _setPhase(_Phase.filters),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         Row(
@@ -428,14 +483,11 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
           isLoading: _busy && !_resolving,
           onPressed: _busy ? null : () => _search(),
         ),
-        if (recents.isNotEmpty || !_searched) ...[
-          const SizedBox(height: AppSizes.sectionGap),
-          _SuggestionsSection(
-            recents: recents,
-            onPick: _busy ? null : (term) => _search(term),
-            onClear: recents.isEmpty
-                ? null
-                : () => ref.read(recentSearchesProvider.notifier).clear(),
+        if (recents.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _RecentRow(
+            terms: recents,
+            onTap: _busy ? null : (term) => _search(term),
           ),
         ],
         if (_resolving) ...[
@@ -494,7 +546,7 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
         if (selected != null)
           _SelectedSummary(
             candidate: selected,
-            onChange: _busy ? null : _toSearch,
+            onChange: widget.preset != null || _busy ? null : _toSearch,
           ),
         const SizedBox(height: AppSizes.sectionGap),
         _SectionCopy(
@@ -605,16 +657,6 @@ const _gardenCopy = <GardenSpot, ({String label, String hint, String icon})>{
   ),
 };
 
-/// Starting points for someone with an empty search box. Common houseplants
-/// and kitchen-garden staples, so the catalog answers with something.
-const _suggestions = <({String label, String icon})>[
-  (label: 'Monstera', icon: AppIcons.suggestionSparkles),
-  (label: 'Snake plant', icon: AppIcons.suggestionPaw),
-  (label: 'Tomato', icon: AppIcons.suggestionSparkles),
-  (label: 'Basil', icon: AppIcons.suggestionPaw),
-  (label: 'Aloe', icon: AppIcons.suggestionSparkles),
-];
-
 const _stageCopy = <PlantAgeStage, ({String label, String hint})>{
   PlantAgeStage.seed: (label: 'Seed', hint: 'Not up yet'),
   PlantAgeStage.seedling: (label: 'Seedling', hint: 'First few leaves'),
@@ -719,62 +761,29 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-class _SuggestionsSection extends StatelessWidget {
-  const _SuggestionsSection({
-    required this.recents,
-    required this.onPick,
-    required this.onClear,
-  });
+class _RecentRow extends StatelessWidget {
+  const _RecentRow({required this.terms, required this.onTap});
 
-  final List<String> recents;
-  final ValueChanged<String>? onPick;
-  final VoidCallback? onClear;
+  final List<String> terms;
+  final ValueChanged<String>? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            SvgPicture.asset(AppIcons.recentClock, width: 18, height: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Recent & suggested',
-                style: AppText.title.copyWith(color: AppColors.ink),
-              ),
-            ),
-            if (onClear != null)
-              GestureDetector(
-                onTap: onClear,
-                child: Text(
-                  'Clear',
-                  style: AppText.label.copyWith(color: AppColors.terracotta),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final term in recents)
-              _ChoicePill(
-                label: term,
-                icon: AppIcons.recentHistory,
-                onTap: onPick == null ? null : () => onPick!(term),
-              ),
-            for (final suggestion in _suggestions)
-              _ChoicePill(
-                label: suggestion.label,
-                icon: suggestion.icon,
-                onTap: onPick == null ? null : () => onPick!(suggestion.label),
-              ),
-          ],
-        ),
-      ],
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: terms.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final term = terms[index];
+          return _ChoicePill(
+            label: term,
+            icon: AppIcons.recentHistory,
+            onTap: onTap == null ? null : () => onTap!(term),
+          );
+        },
+      ),
     );
   }
 }
@@ -949,14 +958,7 @@ class _ResultPhoto extends StatelessWidget {
           Positioned.fill(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-              child: address == null || address.isEmpty
-                  ? const _PhotoPlaceholder()
-                  : Image.network(
-                      address,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const _PhotoPlaceholder(),
-                    ),
+              child: CatalogImage(url: address),
             ),
           ),
           if (isSelected)
@@ -977,21 +979,6 @@ class _ResultPhoto extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-/// Trefle often has no photo for a species, so the slot has to stand alone.
-class _PhotoPlaceholder extends StatelessWidget {
-  const _PhotoPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppColors.surfaceBlush,
-      child: Center(
-        child: SvgPicture.asset(AppIcons.growingSprout, width: 24, height: 24),
       ),
     );
   }
@@ -1117,14 +1104,7 @@ class _SelectedSummary extends StatelessWidget {
             height: 72,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-              child: candidate.imageUrl == null || candidate.imageUrl!.isEmpty
-                  ? const _PhotoPlaceholder()
-                  : Image.network(
-                      candidate.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const _PhotoPlaceholder(),
-                    ),
+              child: CatalogImage(url: candidate.imageUrl),
             ),
           ),
           const SizedBox(width: 12),
@@ -1151,27 +1131,29 @@ class _SelectedSummary extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Semantics(
-            button: true,
-            label: 'Choose a different plant',
-            child: GestureDetector(
-              onTap: onChange,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
-                  shape: BoxShape.circle,
-                ),
-                child: SvgPicture.asset(
-                  AppIcons.setupChangePencil,
-                  width: 15,
-                  height: 15,
+          if (onChange != null) ...[
+            const SizedBox(width: 8),
+            Semantics(
+              button: true,
+              label: 'Choose a different plant',
+              child: GestureDetector(
+                onTap: onChange,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: AppColors.surface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: SvgPicture.asset(
+                    AppIcons.setupChangePencil,
+                    width: 15,
+                    height: 15,
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

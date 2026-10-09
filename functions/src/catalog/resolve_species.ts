@@ -25,6 +25,32 @@ import {
 /** Re-fetch a cached species once its data is this old. */
 const CACHE_TTL_DAYS = 90;
 
+const SEARCH_RANKS = new Set([
+  "species",
+  "subspecies",
+  "variety",
+  "form",
+  "hybrid",
+  "subvariety",
+]);
+
+const SEARCH_FAMILIES = new Set([
+  "Asteraceae",
+  "Orchidaceae",
+  "Fabaceae",
+  "Rubiaceae",
+  "Poaceae",
+  "Lamiaceae",
+  "Apocynaceae",
+]);
+
+function allowedList(value: unknown, allowed: Set<string>): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is string => typeof item === "string" && allowed.has(item),
+  );
+}
+
 /**
  * App Check stays advisory until the app has been exercised on real devices
  * with Play Integrity and App Attest registered. Flip both of these to true
@@ -110,7 +136,16 @@ export const searchSpeciesCatalog = onCall(
     }
 
     try {
-      const matches = await searchTrefleSpecies(query, TREFLE_API_TOKEN.value());
+      const matches = await searchTrefleSpecies(
+        query,
+        TREFLE_API_TOKEN.value(),
+        {
+          ranks: allowedList(request.data?.ranks, SEARCH_RANKS),
+          families: allowedList(request.data?.families, SEARCH_FAMILIES),
+          edible: request.data?.edible === true,
+          vegetable: request.data?.vegetable === true,
+        },
+      );
       return {
         attribution: TREFLE_ATTRIBUTION.attributionText,
         candidates: matches.slice(0, 20).map((match) => ({

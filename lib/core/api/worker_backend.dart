@@ -11,6 +11,7 @@ import '../../features/photos/domain/plant_photo.dart';
 import '../../features/plants/data/species_repository.dart';
 import '../../features/plants/domain/care_profile.dart';
 import '../../features/plants/domain/plant.dart';
+import '../../features/plants/domain/search_filters.dart';
 import '../../features/plants/domain/species.dart';
 import '../errors/app_exception.dart';
 import '../local/app_database.dart';
@@ -479,8 +480,21 @@ class WorkerBackend {
     ];
   }
 
-  Future<SpeciesSearchResult> search(String query) async {
-    final json = await _client.getJson('/v1/species', query: {'q': query});
+  Future<SpeciesSearchResult> search(
+    String query, {
+    SearchFilters filters = const SearchFilters(),
+  }) async {
+    final json = await _client.getJson(
+      '/v1/species',
+      query: {
+        'q': query,
+        if (filters.ranks.isNotEmpty)
+          'rank': [for (final rank in filters.ranks) rank.wire].join(','),
+        if (filters.families.isNotEmpty) 'family': filters.families.join(','),
+        if (filters.edible) 'edible': 'true',
+        if (filters.vegetable) 'vegetable': 'true',
+      },
+    );
     final results = json['results'];
     return SpeciesSearchResult(
       attribution: 'Raíces catalog',
@@ -496,6 +510,7 @@ class WorkerBackend {
                             (item['commonNames'] as List).isNotEmpty)
                         ? (item['commonNames'] as List).first as String?
                         : null,
+                    imageUrl: item['imageUrl'] as String?,
                   ),
             ]
           : const [],
@@ -747,6 +762,7 @@ class WorkerBackend {
       plantGroups: json['plantGroups'] is List
           ? [for (final group in json['plantGroups'] as List) '$group']
           : const [],
+      imageUrl: json['imageUrl'] as String?,
     );
   }
 

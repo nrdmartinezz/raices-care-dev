@@ -9,6 +9,7 @@ import '../features/auth/presentation/splash_screen.dart';
 import '../features/care/presentation/chores_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
+import '../features/plants/data/species_repository.dart';
 import '../features/plants/presentation/add_plant_screen.dart';
 import '../features/plants/presentation/my_plants_screen.dart';
 import '../features/plants/presentation/plant_detail_screen.dart';
@@ -266,11 +267,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AddPlantRoute.path,
         name: AddPlantRoute.name,
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => _slidePage(
-          key: state.pageKey,
-          from: _SlideFrom.bottom,
-          child: const AddPlantScreen(),
-        ),
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          return _slidePage(
+            key: state.pageKey,
+            from: _SlideFrom.bottom,
+            child: AddPlantScreen(
+              preset: extra is SpeciesCandidate ? extra : null,
+            ),
+          );
+        },
       ),
     ],
   );

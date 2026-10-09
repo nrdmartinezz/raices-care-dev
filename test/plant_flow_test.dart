@@ -10,6 +10,7 @@ import 'package:raices/features/care/domain/reminder.dart';
 import 'package:raices/features/home/data/home_providers.dart';
 import 'package:raices/features/plants/data/observation_repository.dart';
 import 'package:raices/features/plants/data/plant_repository.dart';
+import 'package:raices/features/plants/data/recent_searches.dart';
 import 'package:raices/features/plants/data/species_repository.dart';
 import 'package:raices/features/plants/domain/care_profile.dart';
 import 'package:raices/features/plants/domain/garden_spot.dart';
@@ -140,8 +141,56 @@ void main() {
     expect(find.text('STEP 1 OF 3'), findsOneWidget);
     expect(find.text('Choose a plant'), findsOneWidget);
     expect(find.text('Find your next green companion'), findsOneWidget);
-    expect(find.text('Recent & suggested'), findsOneWidget);
-    expect(find.text('Monstera'), findsOneWidget);
+    expect(find.text('Recent & suggested'), findsNothing);
+    expect(find.text('Monstera'), findsNothing);
+
+    final searches = container.read(recentSearchesProvider.notifier);
+    for (final term in [
+      'Aloe',
+      'Basil',
+      'Fern',
+      'Ivy',
+      'Kale',
+      'Mint',
+      'Olive',
+      'Pea',
+    ]) {
+      searches.remember(term);
+    }
+    await tester.pump();
+
+    expect(find.text('Aloe'), findsNothing);
+    expect(find.text('Pea'), findsOneWidget);
+    expect(find.text('Basil', skipOffstage: false), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Filters'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('STEP 1 OF 3'), findsOneWidget);
+    expect(find.text('Apply filters'), findsOneWidget);
+    expect(find.text('Species'), findsOneWidget);
+
+    await tester.tap(find.text('Species'));
+    await tester.pump();
+    expect(find.text('1 selected'), findsOneWidget);
+    expect(find.text('1 filter selected'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('Find your next green companion'), findsOneWidget);
+    expect(find.text('Apply filters'), findsNothing);
+    expect(find.text('1'), findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('Filters'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Species'));
+    await tester.pump();
+    await tester.tap(find.text('Apply filters'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Find your next green companion'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.bySemanticsLabel('Filters, 1 selected'), findsOneWidget);
   });
 
   testWidgets('the plant profile replaces the shell header and keeps the nav', (

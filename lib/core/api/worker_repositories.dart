@@ -11,6 +11,7 @@ import '../../features/plants/data/plant_repository.dart';
 import '../../features/plants/data/species_repository.dart';
 import '../../features/plants/domain/care_profile.dart';
 import '../../features/plants/domain/plant.dart';
+import '../../features/plants/domain/search_filters.dart';
 import '../../features/plants/domain/species.dart';
 import '../../features/settings/data/user_settings_repository.dart';
 import 'worker_backend.dart';
@@ -201,7 +202,10 @@ class WorkerSpeciesRepository extends SpeciesRepository {
       backend.getSources(speciesId);
 
   @override
-  Future<SpeciesSearchResult> search(String query) => backend.search(query);
+  Future<SpeciesSearchResult> search(
+    String query, {
+    SearchFilters filters = const SearchFilters(),
+  }) => backend.search(query, filters: filters);
 
   @override
   Future<String> resolve({String? speciesId, String? trefleSlug}) =>

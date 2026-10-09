@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Memory only: the app carries no local-storage package, so these are a
 /// convenience within a session rather than a saved history.
 class RecentSearches extends Notifier<List<String>> {
-  static const _keep = 3;
+  static const _keep = 7;
 
   @override
   List<String> build() => const [];

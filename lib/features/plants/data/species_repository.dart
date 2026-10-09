@@ -8,6 +8,7 @@ import '../../../core/api/worker_repositories.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../domain/care_profile.dart';
+import '../domain/search_filters.dart';
 import '../domain/species.dart';
 
 /// One result from a catalog search, before the species has been cached.
@@ -101,11 +102,21 @@ class SpeciesRepository {
   }
 
   /// Searches the upstream catalog. Writes nothing; results are candidates.
-  Future<SpeciesSearchResult> search(String query) {
+  Future<SpeciesSearchResult> search(
+    String query, {
+    SearchFilters filters = const SearchFilters(),
+  }) {
     return guardFirebase(() async {
       final response = await _functions
           .httpsCallable('searchSpeciesCatalog')
-          .call<Map<String, dynamic>>({'query': query});
+          .call<Map<String, dynamic>>({
+            'query': query,
+            if (filters.ranks.isNotEmpty)
+              'ranks': [for (final rank in filters.ranks) rank.wire],
+            if (filters.families.isNotEmpty) 'families': filters.families.toList(),
+            if (filters.edible) 'edible': true,
+            if (filters.vegetable) 'vegetable': true,
+          });
 
       final data = response.data;
       final raw = data['candidates'];

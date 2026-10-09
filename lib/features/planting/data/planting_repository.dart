@@ -4,6 +4,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_config.dart';
 import '../../../core/api/api_providers.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../core/firebase/firebase_providers.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../onboarding/data/hardiness_zone_repository.dart';
 import '../../plants/data/species_repository.dart';
@@ -121,8 +122,14 @@ class PlantingRepository {
 }
 
 final plantingRepositoryProvider = Provider<PlantingRepository?>((ref) {
-  if (!usesWorkerApi) return null;
-  return PlantingRepository(ref.watch(apiClientProvider));
+  if (usesWorkerApi) {
+    return PlantingRepository(ref.watch(apiClientProvider));
+  }
+  final base = plantingApiBase;
+  if (base == null) return null;
+  return PlantingRepository(
+    ApiClient(auth: ref.watch(firebaseAuthProvider), baseUrl: base),
+  );
 });
 
 final gardenFrostProvider = FutureProvider<GardenFrost>((ref) async {

@@ -8,12 +8,12 @@ import 'api_config.dart';
 
 /// Talks to the Worker. Every request carries the current Firebase ID token.
 class ApiClient {
-  ApiClient({Dio? dio, required this._auth})
+  ApiClient({Dio? dio, required this._auth, Uri? baseUrl})
     : _dio =
           dio ??
           Dio(
             BaseOptions(
-              baseUrl: configuredApiBase.toString(),
+              baseUrl: (baseUrl ?? configuredApiBase).toString(),
               connectTimeout: const Duration(seconds: 15),
               receiveTimeout: const Duration(seconds: 30),
               headers: {'content-type': 'application/json'},

@@ -149,13 +149,31 @@ async function request<T>(path: string, token: string): Promise<T> {
  * what people type, so a common-name hit is kept and listed first. A query
  * with no common-name hit, such as a botanical name, keeps the full result.
  */
+export interface SpeciesSearchFilters {
+  ranks?: string[];
+  families?: string[];
+  edible?: boolean;
+  vegetable?: boolean;
+}
+
 export async function searchTrefleSpecies(
   query: string,
   token: string,
+  filters: SpeciesSearchFilters = {},
 ): Promise<TrefleSummary[]> {
   const term = query.trim();
+  const params = new URLSearchParams();
+  params.set("q", term);
+  if (filters.ranks?.length) {
+    params.set("filter[rank]", filters.ranks.join(","));
+  }
+  if (filters.families?.length) {
+    params.set("filter[family_name]", filters.families.join(","));
+  }
+  if (filters.edible) params.set("filter[edible]", "true");
+  if (filters.vegetable) params.set("filter[vegetable]", "true");
   const payload = await request<{ data: TrefleSummary[] }>(
-    `/plants/search?q=${encodeURIComponent(term)}`,
+    `/plants/search?${params.toString()}`,
     token,
   );
   return preferCommonName(payload.data ?? [], term.toLowerCase());

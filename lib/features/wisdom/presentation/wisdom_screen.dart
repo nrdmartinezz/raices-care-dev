@@ -12,6 +12,9 @@ import '../../planting/data/planting_repository.dart';
 import '../../planting/presentation/frost_calendar_card.dart';
 import '../../plants/data/recent_searches.dart';
 import '../../plants/data/species_repository.dart';
+import '../../plants/domain/search_filters.dart';
+import '../../plants/presentation/catalog_image.dart';
+import '../../plants/presentation/search_filters_view.dart';
 
 /// Tab 4 — search the shared species catalog.
 class WisdomScreen extends ConsumerStatefulWidget {
@@ -30,14 +33,8 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
   String? _attribution;
   List<SpeciesCandidate> _results = const [];
   Map<String, bool?> _seasons = const {};
-
-  static const _suggestions = [
-    'Monstera',
-    'Snake plant',
-    'Tomato',
-    'Basil',
-    'Aloe',
-  ];
+  SearchFilters _filters = const SearchFilters();
+  var _filtering = false;
 
   @override
   void dispose() {
@@ -60,7 +57,9 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
       _error = null;
     });
     try {
-      final result = await ref.read(speciesRepositoryProvider).search(query);
+      final result = await ref
+          .read(speciesRepositoryProvider)
+          .search(query, filters: _filters);
       if (!mounted) {
         return;
       }
@@ -121,8 +120,33 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
     );
   }
 
+  void _applyFilters(SearchFilters filters) {
+    setState(() {
+      _filters = filters;
+      _filtering = false;
+    });
+    if (_query.text.trim().length >= 2) {
+      _search();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_filtering) {
+      final insets = MediaQuery.paddingOf(context);
+      return SearchFiltersView(
+        filters: _filters,
+        onBack: () => setState(() => _filtering = false),
+        onApply: _applyFilters,
+        padding: EdgeInsets.fromLTRB(
+          AppSizes.screenPadding,
+          AppSizes.headerHeight + insets.top + 12,
+          AppSizes.screenPadding,
+          AppSizes.navHeight + insets.bottom,
+        ),
+      );
+    }
+
     final recents = ref.watch(recentSearchesProvider);
     ref.listen(gardenFrostProvider, (previous, next) {
       final garden = next.value;
@@ -163,32 +187,29 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
                 data: (frost) => FrostCalendarCard(frost: frost),
               ),
           const SizedBox(height: AppSizes.sectionGap),
-          _SearchField(
-            controller: _query,
-            enabled: !_busy,
-            onSubmitted: _search,
+          Row(
+            children: [
+              Expanded(
+                child: _SearchField(
+                  controller: _query,
+                  enabled: !_busy,
+                  onSubmitted: _search,
+                ),
+              ),
+              const SizedBox(width: 16),
+              SearchFilterButton(
+                count: _filters.count,
+                onPressed: _busy ? null : () => setState(() => _filtering = true),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           _SearchButton(isLoading: _busy, onPressed: _busy ? null : _search),
-          if (recents.isNotEmpty || !_searched) ...[
-            const SizedBox(height: AppSizes.sectionGap),
-            Text(
-              'Recent & suggested',
-              style: AppText.title.copyWith(color: AppColors.ink),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final term in recents)
-                  _Pill(label: term, onTap: _busy ? null : () => _search(term)),
-                for (final suggestion in _suggestions)
-                  _Pill(
-                    label: suggestion,
-                    onTap: _busy ? null : () => _search(suggestion),
-                  ),
-              ],
+          if (recents.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _RecentRow(
+              terms: recents,
+              onTap: _busy ? null : _search,
             ),
           ],
           if (_error case final message?) ...[
@@ -320,6 +341,32 @@ class _SearchButton extends StatelessWidget {
   }
 }
 
+class _RecentRow extends StatelessWidget {
+  const _RecentRow({required this.terms, required this.onTap});
+
+  final List<String> terms;
+  final ValueChanged<String>? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: terms.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final term = terms[index];
+          return _Pill(
+            label: term,
+            onTap: onTap == null ? null : () => onTap!(term),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _Pill extends StatelessWidget {
   const _Pill({required this.label, this.onTap});
 
@@ -388,14 +435,7 @@ class _ResultCard extends StatelessWidget {
                 child: SizedBox(
                   width: 72,
                   height: 72,
-                  child: candidate.imageUrl == null
-                      ? const ColoredBox(color: AppColors.surfaceBlush)
-                      : Image.network(
-                          candidate.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const ColoredBox(color: AppColors.surfaceBlush),
-                        ),
+                  child: CatalogImage(url: candidate.imageUrl),
                 ),
               ),
               const SizedBox(width: 12),

@@ -22,6 +22,7 @@ import '../data/observation_repository.dart';
 import '../data/plant_repository.dart';
 import '../data/species_repository.dart';
 import '../domain/care_profile.dart';
+import 'catalog_image.dart';
 import '../domain/garden_spot.dart';
 import '../domain/observation.dart';
 import '../domain/plant.dart';
@@ -446,12 +447,7 @@ class _Hero extends ConsumerWidget {
             color: AppColors.surfaceBlush,
             child: switch ((stored, catalogUrl)) {
               (final image?, _) => Image(image: image, fit: BoxFit.cover),
-              (_, final url?) when url.isNotEmpty => Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    const _HeroPlaceholder(),
-              ),
+              (_, final url?) when url.isNotEmpty => CatalogImage(url: url),
               _ => const _HeroPlaceholder(),
             },
           ),

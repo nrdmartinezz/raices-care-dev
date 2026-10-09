@@ -27,3 +27,18 @@ Uri resolveApiBaseUrl(String raw, {required bool release}) {
 
 Uri get configuredApiBase =>
     resolveApiBaseUrl(apiBaseUrl, release: kReleaseMode);
+
+/// Where sowing calendars are loaded from.
+///
+/// Planting schedules live on the Worker. A debug build that has not set
+/// [apiBaseUrl] still asks the local Worker, so the calendar can show while
+/// the rest of the app stays on Firestore. Release builds keep requiring the
+/// hosted URL.
+Uri? get plantingApiBase {
+  if (apiBaseUrl.isNotEmpty) return configuredApiBase;
+  if (!kDebugMode) return null;
+  final host = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+      ? '10.0.2.2'
+      : '127.0.0.1';
+  return Uri.parse('http://$host:8787');
+}

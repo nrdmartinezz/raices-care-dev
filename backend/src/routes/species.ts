@@ -28,6 +28,7 @@ function speciesJson(row: SpeciesRow, tasks: unknown[] = []) {
     plantGroups: readJson<string[]>(row.plant_groups_json, []),
     toxicity: readJson<Record<string, unknown>>(row.toxicity_json, {}),
     hasImage: !!row.image_object_key,
+    imageUrl: row.image_object_key ? `/v1/species/${row.id}/image` : null,
     source: row.source,
     sourceId: row.source_id,
     updatedAt: iso(row.updated_at),
@@ -75,12 +76,39 @@ speciesRoutes.get("/v1/species", async (c) => {
       ids = (found.results ?? []).map((row) => row.id);
     }
   }
+  const edible = c.req.query("edible") === "true";
+  const vegetable = c.req.query("vegetable") === "true";
+  // Rank and family are accepted so the app can send one query shape. The
+  // local catalog does not store those columns yet, so they are not applied.
   const results = [];
   for (const id of ids) {
     const row = await c.env.DB.prepare("SELECT * FROM species WHERE id = ?").bind(id).first<SpeciesRow>();
-    if (row) results.push(speciesJson(row));
+    if (!row) continue;
+    const groups = readJson<string[]>(row.plant_groups_json, []);
+    if (edible && !groups.includes("edible")) continue;
+    if (vegetable && !groups.includes("vegetable")) continue;
+    results.push(speciesJson(row));
   }
   return c.json({ results, nextCursor: null });
+});
+
+speciesRoutes.get("/v1/species/:speciesId/image", async (c) => {
+  const row = await c.env.DB.prepare(
+    "SELECT image_object_key FROM species WHERE id = ?",
+  )
+    .bind(c.req.param("speciesId"))
+    .first<{ image_object_key: string | null }>();
+  if (!row?.image_object_key) {
+    throw new ApiError(404, "not_found", "Species image not found.");
+  }
+  const object = await c.env.IMAGES.get(row.image_object_key);
+  if (!object) throw new ApiError(404, "not_found", "Species image not found.");
+  return new Response(object.body, {
+    headers: {
+      "content-type": object.httpMetadata?.contentType ?? "image/jpeg",
+      "cache-control": "private, max-age=86400",
+    },
+  });
 });
 
 speciesRoutes.get("/v1/species/:speciesId", async (c) => {

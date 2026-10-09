@@ -32,6 +32,7 @@ abstract final class AppIcons {
   // Step 1, searching for a species.
   static const searchGlass = 'assets/icons/search_glass.svg';
   static const searchClear = 'assets/icons/search_clear.svg';
+  static const searchFilter = 'assets/icons/search_filter.svg';
   static const hintSparkles = 'assets/icons/hint_sparkles.svg';
   static const recentClock = 'assets/icons/recent_clock.svg';
   static const recentHistory = 'assets/icons/recent_history.svg';

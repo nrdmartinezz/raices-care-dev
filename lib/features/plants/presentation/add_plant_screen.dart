@@ -7,6 +7,7 @@ import '../../../app/shell/flow_header.dart';
 import '../../../app/theme.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/domain/app_user.dart';
+import '../data/species_repository.dart';
 import 'add_plant_flow.dart';
 
 /// The central add button's destination.
@@ -15,7 +16,10 @@ import 'add_plant_flow.dart';
 /// and the flow reads as a task you finish or abandon. The same flow is the
 /// last page of onboarding.
 class AddPlantScreen extends ConsumerStatefulWidget {
-  const AddPlantScreen({super.key});
+  const AddPlantScreen({this.preset, super.key});
+
+  /// Opens on plant setup when Wisdom already chose the species.
+  final SpeciesCandidate? preset;
 
   @override
   ConsumerState<AddPlantScreen> createState() => _AddPlantScreenState();
@@ -23,7 +27,8 @@ class AddPlantScreen extends ConsumerStatefulWidget {
 
 class _AddPlantScreenState extends ConsumerState<AddPlantScreen> {
   final _flow = GlobalKey<AddPlantFlowState>();
-  var _step = 1;
+  late var _step = widget.preset == null ? 1 : 2;
+  var _canPop = true;
 
   /// Step 2 goes back to the search rather than off the screen.
   void _back() {
@@ -50,8 +55,9 @@ class _AddPlantScreenState extends ConsumerState<AddPlantScreen> {
     final explain = experience != GardenerExperience.experienced;
     final insets = MediaQuery.viewPaddingOf(context);
 
+    final preset = widget.preset != null;
     return PopScope(
-      canPop: _step == 1,
+      canPop: preset || _canPop,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
           _flow.currentState?.goBack();
@@ -72,8 +78,10 @@ class _AddPlantScreenState extends ConsumerState<AddPlantScreen> {
                 child: AddPlantFlow(
                   key: _flow,
                   explain: explain,
+                  preset: widget.preset,
                   onCreated: _openPlant,
                   onStepChanged: (step) => setState(() => _step = step),
+                  onCanPop: (allowed) => setState(() => _canPop = allowed),
                 ),
               ),
             ),
@@ -82,7 +90,7 @@ class _AddPlantScreenState extends ConsumerState<AddPlantScreen> {
               left: 0,
               right: 0,
               child: FlowHeader(
-                eyebrow: 'STEP $_step OF 3',
+                eyebrow: preset ? 'ADD TO GARDEN' : 'STEP $_step OF 3',
                 title: _step == 1 ? 'Choose a plant' : 'Plant setup',
                 onBack: _back,
               ),
