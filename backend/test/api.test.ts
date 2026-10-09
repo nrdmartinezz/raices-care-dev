@@ -306,7 +306,139 @@ describe("reminders", () => {
     ).first<{ status: string }>();
     expect(delivery?.status).toBe("dry_run");
   });
+
+  it("sends one digest when watering and another chore are due", async () => {
+    const asOf = Date.parse("2026-01-15T20:00:00.000Z");
+    await seedNotifier("digest-user", { timezone: "America/Los_Angeles" });
+    await seedDueReminder("digest-user", "water-1", "water_check", "Check the basil's water", asOf);
+    await seedDueReminder("digest-user", "feed-1", "fertilize", "Feed the basil", asOf);
+    const result = await runReminderCron(env, asOf);
+    expect(result.messages.filter((message) => message.userId === "digest-user")).toEqual([
+      {
+        userId: "digest-user",
+        kind: "chores",
+        title: "2 chores are ready",
+        body: "Including watering. Open Raíces to log today's care.",
+      },
+    ]);
+    const deliveries = await env.DB.prepare(
+      "SELECT status FROM notification_deliveries WHERE user_id = 'digest-user'",
+    ).all<{ status: string }>();
+    expect(deliveries.results).toHaveLength(2);
+    expect(deliveries.results?.every((row) => row.status === "dry_run")).toBe(true);
+  });
+
+  it("holds an overnight reminder until quiet hours end", async () => {
+    const asOf = Date.parse("2026-01-15T06:00:00.000Z");
+    await seedNotifier("quiet-user", { timezone: "America/Los_Angeles" });
+    await seedDueReminder("quiet-user", "quiet-water", "water_check", "Check the water", asOf);
+    const result = await runReminderCron(env, asOf);
+    expect(result.messages.some((message) => message.userId === "quiet-user")).toBe(false);
+    const delivery = await env.DB.prepare(
+      "SELECT status FROM notification_deliveries WHERE reminder_id = 'quiet-water'",
+    ).first();
+    expect(delivery).toBeNull();
+  });
+
+  it("checks in once a week after four idle days", async () => {
+    const asOf = Date.parse("2026-01-15T20:00:00.000Z");
+    await seedNotifier("idle-user", {
+      timezone: "America/Los_Angeles",
+      lastOpenedAt: asOf - 5 * DAY,
+    });
+    const first = await runReminderCron(env, asOf);
+    expect(first.messages.filter((message) => message.userId === "idle-user")).toEqual([
+      {
+        userId: "idle-user",
+        kind: "checkin",
+        title: "Your garden misses you",
+        body: "It's been a few days. Open Raíces and see how things are growing.",
+      },
+    ]);
+    const second = await runReminderCron(env, asOf + 60 * 60 * 1000);
+    expect(second.messages.some((message) => message.userId === "idle-user")).toBe(false);
+    const deliveries = await env.DB.prepare(
+      "SELECT id FROM notification_deliveries WHERE user_id = 'idle-user' AND reminder_id = 'checkin'",
+    ).all();
+    expect(deliveries.results).toHaveLength(1);
+  });
+
+  it("does not check in after a recent open", async () => {
+    const asOf = Date.parse("2026-01-15T20:00:00.000Z");
+    await seedNotifier("recent-user", {
+      timezone: "America/Los_Angeles",
+      lastOpenedAt: asOf - DAY,
+    });
+    const result = await runReminderCron(env, asOf);
+    expect(result.messages.some((message) => message.userId === "recent-user")).toBe(false);
+    const delivery = await env.DB.prepare(
+      "SELECT id FROM notification_deliveries WHERE user_id = 'recent-user' AND reminder_id = 'checkin'",
+    ).first();
+    expect(delivery).toBeNull();
+  });
+
+  it("records an open and the device time zone", async () => {
+    const token = await signToken({ sub: "presence-user" });
+    const response = await call("/v1/me", {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        timezone: "America/Los_Angeles",
+        recordOpen: true,
+      }),
+    });
+    expect(response.status).toBe(200);
+    const row = await env.DB.prepare(
+      "SELECT timezone, last_opened_at FROM users WHERE id = 'presence-user'",
+    ).first<{ timezone: string; last_opened_at: number }>();
+    expect(row?.timezone).toBe("America/Los_Angeles");
+    expect(row?.last_opened_at).toBeGreaterThan(0);
+  });
 });
+
+async function seedNotifier(
+  userId: string,
+  options: { timezone?: string; lastOpenedAt?: number } = {},
+) {
+  const ts = Date.now();
+  await env.DB.prepare(
+    `INSERT INTO users (id, timezone, last_opened_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       timezone = excluded.timezone,
+       last_opened_at = excluded.last_opened_at`,
+  )
+    .bind(userId, options.timezone ?? null, options.lastOpenedAt ?? null, ts, ts)
+    .run();
+  await env.DB.prepare(
+    `INSERT INTO device_tokens (token, user_id, platform, created_at, updated_at)
+     VALUES (?, ?, 'ios', ?, ?)
+     ON CONFLICT(user_id, token) DO NOTHING`,
+  )
+    .bind(`${userId}-token`, userId, ts, ts)
+    .run();
+}
+
+async function seedDueReminder(
+  userId: string,
+  id: string,
+  taskType: string,
+  title: string,
+  asOf: number,
+) {
+  const ts = Date.now();
+  await env.DB.prepare(
+    `INSERT INTO reminders (
+      id, user_id, plant_id, task_type, title, due_at, status, priority,
+      schedule_source, created_at, updated_at
+    ) VALUES (?, ?, 'plant-x', ?, ?, ?, 'open', 'normal', 'user', ?, ?)`,
+  )
+    .bind(id, userId, taskType, title, asOf - 1000, ts, ts)
+    .run();
+}
 
 describe("photos", () => {
   it("stores a private image and refuses another user", async () => {

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_config.dart';
@@ -34,9 +35,13 @@ class UserSettingsRepository {
 
   /// Asks for notification permission and registers this device.
   ///
-  /// Call after sign-in. `generateDueReminderNotifications` reads these tokens,
-  /// and skips a user entirely when the list is empty.
+  /// Call after the first plant is saved. Web does not prompt. Later launches
+  /// use [refreshGrantedPushToken] so a gardener who already allowed
+  /// notifications is not asked again.
   Future<bool> enablePushNotifications() {
+    if (kIsWeb) {
+      return Future.value(false);
+    }
     return guardFirebase(() async {
       final settings = await _messaging.requestPermission();
       final granted =
@@ -52,6 +57,26 @@ class UserSettingsRepository {
         await registerDeviceToken(token);
       }
       return true;
+    });
+  }
+
+  /// Saves a fresh token when permission is already granted.
+  Future<void> refreshGrantedPushToken() {
+    if (kIsWeb) {
+      return Future.value();
+    }
+    return guardFirebase(() async {
+      final settings = await _messaging.getNotificationSettings();
+      final granted =
+          settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+      if (!granted) {
+        return;
+      }
+      final token = await _messaging.getToken();
+      if (token != null) {
+        await registerDeviceToken(token);
+      }
     });
   }
 

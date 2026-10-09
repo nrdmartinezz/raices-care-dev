@@ -461,6 +461,15 @@ class WorkerBackend {
     );
   }
 
+  /// Marks this open and stores the device's IANA time zone for quiet hours.
+  Future<void> recordPresence({String? timezone}) {
+    return _client.sendJson(
+      'PUT',
+      '/v1/me',
+      body: {'recordOpen': true, 'timezone': ?timezone},
+    );
+  }
+
   Future<void> registerDeviceToken(String token, {String? platform}) async {
     await _database.saveDocument(
       collection: 'tokens',

@@ -14,6 +14,7 @@ const profileSchema = z
     displayName: z.string().max(120).nullable().optional(),
     locale: z.string().max(35).nullable().optional(),
     timezone: z.string().max(80).nullable().optional(),
+    recordOpen: z.boolean().optional(),
   })
   .strict();
 
@@ -78,6 +79,7 @@ meRoutes.put("/v1/me", async (c) => {
       display_name = COALESCE(?, display_name),
       locale = COALESCE(?, locale),
       timezone = COALESCE(?, timezone),
+      last_opened_at = CASE WHEN ? = 1 THEN ? ELSE last_opened_at END,
       updated_at = ?
      WHERE id = ? AND deleted_at IS NULL`,
   )
@@ -86,6 +88,8 @@ meRoutes.put("/v1/me", async (c) => {
       body.displayName === undefined ? null : body.displayName,
       body.locale === undefined ? null : body.locale,
       body.timezone === undefined ? null : body.timezone,
+      body.recordOpen === true ? 1 : 0,
+      ts,
       ts,
       userId,
     )

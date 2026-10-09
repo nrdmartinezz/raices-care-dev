@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -7,6 +8,7 @@ import '../../../app/assets.dart';
 import '../../../app/shell/flow_header.dart';
 import '../../../app/theme.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../settings/data/user_settings_repository.dart';
 import '../../photos/data/photo_repository.dart';
 import '../../photos/presentation/photo_picker.dart';
 import '../data/plant_repository.dart';
@@ -288,6 +290,8 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
       throw const MalformedDataException('Choose a plant first.');
     }
 
+    final existing = ref.read(activePlantsProvider).asData?.value;
+    final firstPlant = existing == null || existing.isEmpty;
     final plantId = _plantId ??= _uuid.v4();
     var coverPath = _coverPath;
     final photo = _photo;
@@ -324,7 +328,22 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
             coverPhotoPath: coverPath,
           ),
         );
+    if (firstPlant) {
+      await _offerCareNotifications();
+    }
     return plantId;
+  }
+
+  /// The plant is already saved if this fails. Web never prompts.
+  Future<void> _offerCareNotifications() async {
+    if (kIsWeb) {
+      return;
+    }
+    try {
+      await ref.read(userSettingsRepositoryProvider).enablePushNotifications();
+    } on AppException {
+      // Permission can be granted on a later launch.
+    }
   }
 
   Future<void> _skip() async {
