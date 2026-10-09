@@ -84,6 +84,7 @@ class AppDatabase extends _$AppDatabase {
               'photos',
               'tokens',
               'gardens',
+              'frost',
             ]),
           ))
           .go();

@@ -154,7 +154,8 @@ String? _plantingNote(
   return switch (garden) {
     null ||
     GardenFrostMissingZip() => 'Finish garden setup to see the frost calendar.',
-    GardenFrostUnavailable() =>
+    GardenFrostUnavailable() ||
+    GardenFrostReady(remembered: true) =>
       'The frost calendar is not available for this garden.',
     GardenFrostReady() => 'No sowing calendar is published for this plant yet.',
   };

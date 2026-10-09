@@ -88,7 +88,9 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
   Future<Map<String, bool?>> _seasonsFor(List<SpeciesCandidate> results) async {
     final garden = ref.read(gardenFrostProvider).value;
     final repository = ref.read(plantingRepositoryProvider);
-    if (garden is! GardenFrostReady || repository == null) return const {};
+    if (garden is! GardenFrostReady || garden.remembered || repository == null) {
+      return const {};
+    }
     final names = [
       for (final candidate in results)
         if (candidate.scientificName.trim().isNotEmpty)
@@ -150,6 +152,10 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
     final recents = ref.watch(recentSearchesProvider);
     ref.listen(gardenFrostProvider, (previous, next) {
       final garden = next.value;
+      if (garden is GardenFrostReady && garden.remembered) {
+        if (_seasons.isNotEmpty) setState(() => _seasons = const {});
+        return;
+      }
       if (garden is! GardenFrostReady || !_searched || _results.isEmpty) {
         return;
       }

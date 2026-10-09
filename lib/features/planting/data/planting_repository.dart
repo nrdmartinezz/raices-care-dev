@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
@@ -5,10 +7,13 @@ import '../../../core/api/api_config.dart';
 import '../../../core/api/api_providers.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
+import '../../../core/local/app_database.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../onboarding/data/hardiness_zone_repository.dart';
 import '../../plants/data/species_repository.dart';
 import '../domain/sowing_calendar.dart';
+
+const frostCacheCollection = 'frost';
 
 class FrostDates {
   const FrostDates({
@@ -48,12 +53,81 @@ class GardenFrostReady extends GardenFrost {
     required this.frost,
     required this.latitude,
     required this.longitude,
+    this.remembered = false,
   });
 
   final String? zone;
   final FrostDates frost;
   final double latitude;
   final double longitude;
+
+  /// True when these dates are the last successful lookup for this ZIP.
+  /// A later 404 kept them. Sowing windows still need a live station.
+  final bool remembered;
+}
+
+Future<void> saveRememberedFrost({
+  required AppDatabase database,
+  required String zip,
+  required GardenFrostReady frost,
+}) {
+  return database.saveDocument(
+    collection: frostCacheCollection,
+    id: zip,
+    payload: jsonEncode({
+      'lastSpringFrost': frost.frost.lastSpringFrost,
+      'firstFallFrost': frost.frost.firstFallFrost,
+      'label': frost.frost.label,
+      'zone': frost.zone,
+      'latitude': frost.latitude,
+      'longitude': frost.longitude,
+    }),
+  );
+}
+
+/// The saved frost calendar for [zip], or null when this ZIP has none.
+Future<GardenFrostReady?> readRememberedFrost({
+  required AppDatabase database,
+  required String zip,
+  String? zone,
+}) async {
+  final row = await database.readDocument(frostCacheCollection, zip);
+  if (row == null) return null;
+  return decodeRememberedFrost(row.payload, zone: zone);
+}
+
+GardenFrostReady? decodeRememberedFrost(String payload, {String? zone}) {
+  Object? decoded;
+  try {
+    decoded = jsonDecode(payload);
+  } on FormatException {
+    return null;
+  }
+  if (decoded is! Map) return null;
+  final lastSpring = decoded['lastSpringFrost'];
+  final firstFall = decoded['firstFallFrost'];
+  final latitude = decoded['latitude'];
+  final longitude = decoded['longitude'];
+  if (lastSpring is! String || lastSpring.isEmpty) return null;
+  if (firstFall is! String || firstFall.isEmpty) return null;
+  if (latitude is! num || longitude is! num) return null;
+  final storedZone = decoded['zone'];
+  final label = decoded['label'];
+  final profileZone = zone != null && zone.isNotEmpty ? zone : null;
+  final cachedZone = storedZone is String && storedZone.isNotEmpty
+      ? storedZone
+      : null;
+  return GardenFrostReady(
+    zone: profileZone ?? cachedZone,
+    frost: FrostDates(
+      lastSpringFrost: lastSpring,
+      firstFallFrost: firstFall,
+      label: label is String && label.isNotEmpty ? label : '30-year averages',
+    ),
+    latitude: latitude.toDouble(),
+    longitude: longitude.toDouble(),
+    remembered: true,
+  );
 }
 
 class PlantingRepository {
@@ -141,13 +215,16 @@ final gardenFrostProvider = FutureProvider<GardenFrost>((ref) async {
     return const GardenFrostMissingZip();
   }
 
+  final database = ref.watch(appDatabaseProvider);
+  final zoneFallback = savedZone != null && savedZone.isNotEmpty
+      ? savedZone
+      : null;
+
   try {
     final lookedUp = await ref
         .watch(hardinessZoneRepositoryProvider)
         .lookup(zip);
-    final zone = (savedZone != null && savedZone.isNotEmpty)
-        ? savedZone
-        : lookedUp.zone;
+    final zone = zoneFallback ?? lookedUp.zone;
     final latitude = lookedUp.latitude;
     final longitude = lookedUp.longitude;
     if (latitude == null || longitude == null) {
@@ -161,24 +238,25 @@ final gardenFrostProvider = FutureProvider<GardenFrost>((ref) async {
       latitude: latitude,
       longitude: longitude,
     );
-    return GardenFrostReady(
+    final ready = GardenFrostReady(
       zone: zone,
       frost: frost,
       latitude: latitude,
       longitude: longitude,
     );
+    await saveRememberedFrost(database: database, zip: zip, frost: ready);
+    return ready;
   } on ZoneLookupException {
-    return GardenFrostUnavailable(
-      zone: savedZone != null && savedZone.isNotEmpty ? savedZone : null,
-    );
+    return GardenFrostUnavailable(zone: zoneFallback);
   } on NotFoundException {
-    return GardenFrostUnavailable(
-      zone: savedZone != null && savedZone.isNotEmpty ? savedZone : null,
+    final remembered = await readRememberedFrost(
+      database: database,
+      zip: zip,
+      zone: zoneFallback,
     );
+    return remembered ?? GardenFrostUnavailable(zone: zoneFallback);
   } on AppException {
-    return GardenFrostUnavailable(
-      zone: savedZone != null && savedZone.isNotEmpty ? savedZone : null,
-    );
+    return GardenFrostUnavailable(zone: zoneFallback);
   }
 });
 
@@ -190,7 +268,7 @@ Future<SowingCalendar?> _loadSowing({
   if (repository == null || request.scientificName.trim().length < 2) {
     return null;
   }
-  if (garden is! GardenFrostReady) return null;
+  if (garden is! GardenFrostReady || garden.remembered) return null;
   try {
     return await repository.species(
       name: request.scientificName,
