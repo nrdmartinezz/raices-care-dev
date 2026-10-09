@@ -1,19 +1,19 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Local Worker only. No route is attached, so this does not publish to
+  // Local Worker only. No route is attached, so this does not publish to https://raices-api.nrd-martinezz.workers.dev
   // api.raices.care. Deploy with `wrangler deploy` when that is intentional.
   "name": "raices-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-22",
   "compatibility_flags": ["nodejs_compat"],
   "account_id": "6cd4a37d293aa36c028b11945b8c74e1",
-  "workers_dev": false,
+  "workers_dev": true,
   "triggers": {
     "crons": ["*/15 * * * *"]
   },
   "vars": {
     "FIREBASE_PROJECT_ID": "raices-care",
-    "ENVIRONMENT": "development",
+    "ENVIRONMENT": "production",
     "DRY_RUN_PUSH": "true",
     "APP_CHECK_ENFORCE": "false",
     "ALLOWED_ORIGINS": ""

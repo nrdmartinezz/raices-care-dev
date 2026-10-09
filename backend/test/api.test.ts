@@ -369,6 +369,25 @@ describe("photos", () => {
   });
 });
 
+describe("profile photo", () => {
+  it("serves an avatar saved before the database pointer existed", async () => {
+    const key = "users/legacy-avatar/profile/avatar.jpg";
+    await env.IMAGES.put(key, jpeg, { httpMetadata: { contentType: "image/jpeg" } });
+
+    const streamed = await call("/v1/me/avatar", dev("legacy-avatar"), {
+      ...env,
+      ENVIRONMENT: "development",
+    });
+    expect(streamed.status).toBe(200);
+    expect(new Uint8Array(await streamed.arrayBuffer())).toEqual(jpeg);
+
+    const row = await env.DB.prepare("SELECT avatar_object_key FROM users WHERE id = ?")
+      .bind("legacy-avatar")
+      .first<{ avatar_object_key: string }>();
+    expect(row?.avatar_object_key).toBe(key);
+  });
+});
+
 describe("species search", () => {
   it("returns the catalog image with each result", async () => {
     const ts = Date.now();

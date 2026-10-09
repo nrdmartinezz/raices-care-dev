@@ -179,12 +179,23 @@ meRoutes.get("/v1/me/avatar", async (c) => {
   )
     .bind(userId)
     .first<{ avatar_object_key: string | null }>();
-  if (!row?.avatar_object_key) throw new ApiError(404, "not_found", "Profile photo not found.");
-  const object = await c.env.IMAGES.get(row.avatar_object_key);
+  // Photos uploaded before the Worker stored the JPEG at this key and kept the
+  // path in Firestore only. The database pointer was never written.
+  const key = row?.avatar_object_key || avatarKey(userId);
+  const object = await c.env.IMAGES.get(key);
   if (!object) throw new ApiError(404, "not_found", "Profile photo not found.");
+  if (!row?.avatar_object_key) {
+    await ensureUser(c.env.DB, userId);
+    await c.env.DB.prepare(
+      `UPDATE users SET avatar_object_key = ?, updated_at = ?
+       WHERE id = ? AND deleted_at IS NULL AND avatar_object_key IS NULL`,
+    )
+      .bind(key, now(), userId)
+      .run();
+  }
   return new Response(object.body, {
     headers: {
-      "content-type": "image/jpeg",
+      "content-type": object.httpMetadata?.contentType ?? "image/jpeg",
       "cache-control": "private, max-age=300",
     },
   });
