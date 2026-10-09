@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../layout.dart';
 import '../router.dart';
 import '../theme.dart';
 import 'app_bottom_nav.dart';
 import 'app_header.dart';
+import 'desktop_sidebar.dart';
 import 'flow_header.dart';
 import 'header_bell.dart';
 
@@ -101,6 +103,52 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tab = ref.watch(shellTabProvider);
     final index = tab?.index ?? 0;
+    void selectTab(int selected) => _selectTab(context, ref, selected);
+    void addPlant() => context.pushNamed(AddPlantRoute.name);
+
+    if (AppLayout.isWide(context)) {
+      return Scaffold(
+        backgroundColor: AppColors.canvas,
+        body: SafeArea(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DesktopSidebar(
+                currentIndex: index,
+                onSelect: selectTab,
+                onAdd: addPlant,
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth.clamp(
+                      0.0,
+                      AppLayout.contentMaxWidth,
+                    );
+                    return Align(
+                      alignment: Alignment.topCenter,
+                      child: SizedBox(
+                        width: width,
+                        height: constraints.maxHeight,
+                        child: Column(
+                          children: [
+                            ?_pushedHeader(context),
+                            Expanded(
+                              child: _BranchFade(index: index, child: child),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.canvas,
       body: Stack(
@@ -115,8 +163,8 @@ class AppShell extends ConsumerWidget {
             right: 0,
             child: AppBottomNav(
               currentIndex: index,
-              onSelect: (selected) => _selectTab(context, ref, selected),
-              onAdd: () => context.pushNamed(AddPlantRoute.name),
+              onSelect: selectTab,
+              onAdd: addPlant,
             ),
           ),
         ],
@@ -151,6 +199,51 @@ class AppShell extends ConsumerWidget {
     2 => ChoresRoute.path,
     _ => WisdomRoute.path,
   };
+
+  /// A back bar for screens pushed over a tab. Tab roots draw their own title.
+  Widget? _pushedHeader(BuildContext context) {
+    final routeName = GoRouterState.of(context).topRoute?.name;
+    if (routeName == ProfileRoute.name) {
+      return FlowHeader(
+        eyebrow: 'YOUR ACCOUNT',
+        title: 'Profile',
+        onBack: () => context.canPop()
+            ? context.pop()
+            : context.goNamed(HomeRoute.name),
+        action: const HeaderBell(showUnread: true),
+      );
+    }
+    if (routeName == AccountSettingsRoute.name ||
+        routeName == SupportRoute.name) {
+      return FlowHeader(
+        eyebrow: 'YOUR ACCOUNT',
+        title: routeName == SupportRoute.name ? 'Support' : 'Settings',
+        onBack: () => context.canPop()
+            ? context.pop()
+            : context.goNamed(ProfileRoute.name),
+        action: const HeaderBell(showUnread: true),
+      );
+    }
+    if (routeName == PlantDetailRoute.name) {
+      return FlowHeader(
+        eyebrow: 'MY PLANTS',
+        title: 'Plant profile',
+        onBack: () => context.canPop()
+            ? context.pop()
+            : context.goNamed(MyPlantsRoute.name),
+      );
+    }
+    if (routeName == SpeciesArticleRoute.name) {
+      return FlowHeader(
+        eyebrow: 'WISDOM',
+        title: 'Species',
+        onBack: () => context.canPop()
+            ? context.pop()
+            : context.goNamed(WisdomRoute.name),
+      );
+    }
+    return null;
+  }
 
   /// The bar at the top of the frame.
   ///
@@ -255,13 +348,24 @@ class ShellScrollView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final insets = MediaQuery.paddingOf(context);
+    final wide = AppLayout.isWide(context);
     return SingleChildScrollView(
-      padding: EdgeInsets.only(
-        top: AppSizes.headerHeight + AppSizes.headerContentGap + insets.top,
-        bottom: AppSizes.navHeight + 32 + insets.bottom,
-        left: AppSizes.screenPadding,
-        right: AppSizes.screenPadding,
-      ),
+      padding: wide
+          ? EdgeInsets.fromLTRB(
+              AppLayout.contentPadding,
+              AppLayout.contentPadding,
+              AppLayout.contentPadding,
+              AppLayout.contentPadding + insets.bottom,
+            )
+          : EdgeInsets.only(
+              top:
+                  AppSizes.headerHeight +
+                  AppSizes.headerContentGap +
+                  insets.top,
+              bottom: AppSizes.navHeight + 32 + insets.bottom,
+              left: AppSizes.screenPadding,
+              right: AppSizes.screenPadding,
+            ),
       child: child,
     );
   }

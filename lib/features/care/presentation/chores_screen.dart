@@ -4,8 +4,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/assets.dart';
+import '../../../app/layout.dart';
 import '../../../app/router.dart';
 import '../../../app/shell/app_shell.dart';
+import '../../../app/shell/desktop_header_actions.dart';
 import '../../../app/theme.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../home/data/home_mappers.dart';
@@ -138,7 +140,7 @@ class _Intro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final copy = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -167,6 +169,17 @@ class _Intro extends StatelessWidget {
             height: 22.75 / 14,
           ),
         ),
+      ],
+    );
+    if (!AppLayout.isWide(context)) {
+      return copy;
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: copy),
+        const SizedBox(width: 16),
+        const DesktopHeaderActions(),
       ],
     );
   }

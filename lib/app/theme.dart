@@ -15,6 +15,9 @@ abstract final class AppColors {
 
   static const mint = Color(0xFFBCEDDA);
 
+  /// The selected item in the desktop sidebar. A touch deeper than [mint].
+  static const navActive = Color(0xFFBAE8D6);
+
   /// The pale mint behind a plant tag. Lighter than [mint], which is for
   /// filled indicators.
   static const mintSoft = Color(0xFFE4F7EF);
@@ -98,6 +101,20 @@ abstract final class AppText {
     fontWeight: FontWeight.w700,
   );
 
+  /// 14/18 semibold. Unselected items in the desktop sidebar.
+  static TextStyle get subtitleSemiBold => GoogleFonts.plusJakartaSans(
+    fontSize: 14,
+    height: 18 / 14,
+    fontWeight: FontWeight.w600,
+  );
+
+  /// 14/20 medium. The season line under a desktop page title.
+  static TextStyle get bodyMedium => GoogleFonts.plusJakartaSans(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.w500,
+  );
+
   /// 12/18 italic. Botanical names.
   static TextStyle get bodyItalic => GoogleFonts.plusJakartaSans(
     fontSize: 12,
@@ -119,6 +136,21 @@ abstract final class AppText {
     height: 34 / 26,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.26,
+  );
+
+  /// Newsreader 32/40. Desktop page titles such as Living Catalog.
+  static TextStyle get displayLarge => GoogleFonts.newsreader(
+    fontSize: 32,
+    height: 40 / 32,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.4,
+  );
+
+  /// Newsreader 22/30. Names on the desktop plant catalog.
+  static TextStyle get catalogName => GoogleFonts.newsreader(
+    fontSize: 22,
+    height: 30.25 / 22,
+    fontWeight: FontWeight.w600,
   );
 
   /// Newsreader 22/28. The temperature readout.

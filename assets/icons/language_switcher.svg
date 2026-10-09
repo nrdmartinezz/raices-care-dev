@@ -1,0 +1,11 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Language Switcher">
+<rect x="0.5" y="0.5" width="39" height="39" rx="19.5" fill="#FFF8F6"/>
+<rect x="0.5" y="0.5" width="39" height="39" rx="19.5" stroke="#F7E4DE"/>
+<g id="Vector">
+</g>
+<g id="Indicator">
+<rect x="20" y="16" width="8" height="8" rx="4" fill="#9F3C16"/>
+</g>
+</g>
+</svg>
