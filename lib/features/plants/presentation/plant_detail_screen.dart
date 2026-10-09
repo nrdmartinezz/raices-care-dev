@@ -56,6 +56,7 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
   late bool _showBanner = widget.isNew;
   var _removing = false;
   var _scheduling = false;
+  var _loggingWater = false;
   String? _error;
 
   @override
@@ -116,9 +117,11 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
         ],
         _Hero(plant: plant, species: species),
         const SizedBox(height: AppSizes.sectionGap),
-        _Stats(plant: plant),
-        const SizedBox(height: AppSizes.sectionGap),
-        _QuickActions(
+        _PlantOverview(
+          plant: plant,
+          waterTask: waterTask,
+          now: now,
+          loggingWater: _loggingWater,
           onWater: () => _logWatering(plant),
           onNote: () => _writeNote(plant),
         ),
@@ -133,7 +136,6 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
         _NextCare(
           plant: plant,
           reminders: reminders,
-          waterTask: waterTask,
           now: now,
           isBusy: _scheduling,
           onAdd: () => _addToChores(plant),
@@ -320,7 +322,14 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
   }
 
   Future<void> _logWatering(Plant plant) async {
-    setState(() => _error = null);
+    if (_loggingWater ||
+        wateredToday(plant.currentCare.lastWateredAt, ref.read(nowProvider))) {
+      return;
+    }
+    setState(() {
+      _error = null;
+      _loggingWater = true;
+    });
     try {
       await ref
           .read(careEventRepositoryProvider)
@@ -341,6 +350,8 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
       if (mounted) {
         setState(() => _error = error.message);
       }
+    } finally {
+      if (mounted) setState(() => _loggingWater = false);
     }
   }
 
@@ -483,47 +494,94 @@ class _HeroPlaceholder extends StatelessWidget {
   }
 }
 
-class _Stats extends StatelessWidget {
-  const _Stats({required this.plant});
+class _PlantOverview extends StatelessWidget {
+  const _PlantOverview({
+    required this.plant,
+    required this.waterTask,
+    required this.now,
+    required this.loggingWater,
+    required this.onWater,
+    required this.onNote,
+  });
 
   final Plant plant;
+  final CareProfileTask? waterTask;
+  final DateTime now;
+  final bool loggingWater;
+  final VoidCallback onWater;
+  final VoidCallback onNote;
+
+  @override
+  Widget build(BuildContext context) {
+    final watered = wateredToday(plant.currentCare.lastWateredAt, now);
+    return Column(
+      children: [
+        _Stats(plant: plant, now: now),
+        const SizedBox(height: 12),
+        _WateringStatus(
+          plant: plant,
+          waterTask: waterTask,
+          now: now,
+          watered: watered,
+        ),
+        const SizedBox(height: 12),
+        _QuickActions(
+          watered: watered,
+          logging: loggingWater,
+          onWater: onWater,
+          onNote: onNote,
+        ),
+      ],
+    );
+  }
+}
+
+class _Stats extends StatelessWidget {
+  const _Stats({required this.plant, required this.now});
+
+  final Plant plant;
+  final DateTime now;
 
   @override
   Widget build(BuildContext context) {
     final garden = GardenSpot.fromWire(plant.gardenId);
-
-    // Intrinsic height so the three tiles match the tallest, which they
-    // cannot work out for themselves inside a scroll view.
+    final born = plant.acquiredAt ?? plant.plantedAt ?? plant.createdAt;
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: _StatTile(
-              icon: AppIcons.statGarden,
-              label: 'GARDEN',
+            child: _StatChip(
+              icon: AppIcons.statPlace,
+              iconWash: AppColors.mint,
+              background: AppColors.mintSoft,
               value: garden == null ? 'Not set' : gardenSpotLabel(garden),
+              caption: garden == null ? 'Place' : gardenSpotHint(garden),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
-            child: _StatTile(
-              icon: AppIcons.statStage,
-              label: 'STAGE',
-              value: plantStageLabel(plant.plantAgeStage),
+            child: _StatChip(
+              icon: AppIcons.statAge,
+              iconWash: AppColors.surfaceBlush,
+              background: AppColors.surfaceWarm,
+              value: born == null ? 'Not set' : estimatedAgeLabel(born, now),
+              caption: 'Estimated age',
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
-            child: _StatTile(
-              icon: AppIcons.statHealth,
-              label: 'CONDITION',
+            child: _StatChip(
+              icon: AppIcons.statGrowth,
+              iconWash: AppColors.mint,
+              background: AppColors.mintSoft,
               value: switch (plant.status.health) {
                 PlantHealth.healthy => 'Thriving',
                 PlantHealth.needsAttention => 'Needs care',
                 PlantHealth.recovering => 'Recovering',
                 PlantHealth.unknown => 'Not set',
               },
+              caption: 'Growth status',
             ),
           ),
         ],
@@ -532,37 +590,65 @@ class _Stats extends StatelessWidget {
   }
 }
 
-class _StatTile extends StatelessWidget {
-  const _StatTile({
+class _StatChip extends StatelessWidget {
+  const _StatChip({
     required this.icon,
-    required this.label,
+    required this.iconWash,
+    required this.background,
     required this.value,
+    required this.caption,
   });
 
   final String icon;
-  final String label;
+  final Color iconWash;
+  final Color background;
   final String value;
+  final String caption;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      constraints: const BoxConstraints(minHeight: 78),
+      padding: const EdgeInsets.all(9),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: background,
         borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SvgPicture.asset(icon, width: 16, height: 16),
-          const SizedBox(height: 8),
-          Text(label, style: AppText.eyebrow.copyWith(color: AppColors.muted)),
-          const SizedBox(height: 2),
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: iconWash,
+                  shape: BoxShape.circle,
+                ),
+                child: SvgPicture.asset(icon),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  value,
+                  style: AppText.label.copyWith(
+                    color: AppColors.ink,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
           Text(
-            value,
-            style: AppText.subtitleBold.copyWith(color: AppColors.ink),
+            caption,
+            style: AppText.caption.copyWith(
+              color: AppColors.body,
+              fontSize: 10,
+              height: 1.2,
+            ),
           ),
         ],
       ),
@@ -570,21 +656,149 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.onWater, required this.onNote});
+class _WateringStatus extends StatelessWidget {
+  const _WateringStatus({
+    required this.plant,
+    required this.waterTask,
+    required this.now,
+    required this.watered,
+  });
 
+  final Plant plant;
+  final CareProfileTask? waterTask;
+  final DateTime now;
+  final bool watered;
+
+  static const _dropletWash = Color(0xFFF4D8C7);
+  static const _caption = Color(0xFF8A5A3C);
+  static const _fallbackTitle = 'Check soil moisture today';
+  static const _fallbackHint = 'Water only if the top 5 cm is dry.';
+
+  @override
+  Widget build(BuildContext context) {
+    final next = plant.nextActions.nextWaterCheckAt;
+    final due = next == null || !next.isAfter(now);
+    final title = watered
+        ? 'Watered today'
+        : due
+        ? 'Due for check'
+        : dueLabel(next, now: now);
+    final detail = watered
+        ? nextCheckLabel(next ?? _fallbackNext(now))
+        : (waterTask?.title ?? _fallbackTitle);
+    final hint = waterTask?.instructions ?? _fallbackHint;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceWarm,
+        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: _dropletWash,
+                  shape: BoxShape.circle,
+                ),
+                child: SvgPicture.asset(AppIcons.statusDroplets),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppText.body.copyWith(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      lastWateredCaption(plant.currentCare.lastWateredAt, now),
+                      style: AppText.caption.copyWith(
+                        color: _caption,
+                        fontSize: 10,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, thickness: 1, color: AppColors.border),
+          const SizedBox(height: 8),
+          Text(
+            detail,
+            style: AppText.caption.copyWith(
+              color: AppColors.body,
+              fontSize: 10,
+              height: 1.2,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            hint,
+            style: AppText.caption.copyWith(
+              color: AppColors.body,
+              fontSize: 10,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  DateTime _fallbackNext(DateTime now) {
+    final days = waterTask?.intervalDays ?? 7;
+    final last = plant.currentCare.lastWateredAt ?? now;
+    return last.add(Duration(days: days));
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  const _QuickActions({
+    required this.watered,
+    required this.logging,
+    required this.onWater,
+    required this.onNote,
+  });
+
+  final bool watered;
+  final bool logging;
   final VoidCallback onWater;
   final VoidCallback onNote;
 
   @override
   Widget build(BuildContext context) {
+    final canWater = !watered && !logging;
     return Row(
       children: [
         Expanded(
           child: _ActionButton(
             icon: AppIcons.actionLogWatering,
-            label: 'Log watering',
-            isPrimary: true,
+            label: watered
+                ? 'Watered today'
+                : logging
+                ? 'Saving'
+                : 'Log watering',
+            background: AppColors.green,
+            foreground: AppColors.surface,
+            enabled: canWater,
             onTap: onWater,
           ),
         ),
@@ -593,7 +807,8 @@ class _QuickActions extends StatelessWidget {
           child: _ActionButton(
             icon: AppIcons.actionAddNote,
             label: 'Add note',
-            isPrimary: false,
+            background: AppColors.surfaceBlush,
+            foreground: AppColors.terracotta,
             onTap: onNote,
           ),
         ),
@@ -606,46 +821,51 @@ class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.icon,
     required this.label,
-    required this.isPrimary,
+    required this.background,
+    required this.foreground,
     required this.onTap,
+    this.enabled = true,
   });
 
   final String icon;
   final String label;
-  final bool isPrimary;
+  final Color background;
+  final Color foreground;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(AppSizes.cardRadius);
-    return Material(
-      color: isPrimary ? AppColors.terracotta : AppColors.surface,
-      borderRadius: radius,
-      child: InkWell(
-        onTap: onTap,
+    return Opacity(
+      opacity: enabled ? 1 : 0.45,
+      child: Material(
+        color: background,
         borderRadius: radius,
-        child: Container(
-          height: 48,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            border: Border.all(
-              color: isPrimary ? AppColors.terracotta : AppColors.border,
-            ),
-            boxShadow: AppShadows.card,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SvgPicture.asset(icon, width: 16, height: 16),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: AppText.titleSemiBold.copyWith(
-                  color: isPrimary ? AppColors.surface : AppColors.ink,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: radius,
+          child: SizedBox(
+            height: 46,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SvgPicture.asset(icon),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.label.copyWith(
+                      color: foreground,
+                      fontSize: 13,
+                      height: 1.2,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -658,7 +878,6 @@ class _NextCare extends StatelessWidget {
   const _NextCare({
     required this.plant,
     required this.reminders,
-    required this.waterTask,
     required this.now,
     required this.isBusy,
     required this.onAdd,
@@ -667,7 +886,6 @@ class _NextCare extends StatelessWidget {
 
   final Plant plant;
   final List<Reminder> reminders;
-  final CareProfileTask? waterTask;
   final DateTime now;
   final bool isBusy;
   final VoidCallback onAdd;
@@ -678,7 +896,11 @@ class _NextCare extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final next = reminders.firstOrNull;
+    final others = [
+      for (final reminder in reminders)
+        if (reminder.taskType != ReminderTaskType.waterCheck) reminder,
+    ]..sort((a, b) => a.dueAt.compareTo(b.dueAt));
+    final next = others.firstOrNull;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,12 +921,12 @@ class _NextCare extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (next == null)
+              if (next == null && !_onSchedule)
                 Text(
                   'This plant is not on the chores list yet.',
                   style: AppText.bodyLarge.copyWith(color: AppColors.body),
                 )
-              else ...[
+              else if (next != null) ...[
                 Row(
                   children: [
                     SvgPicture.asset(
@@ -734,15 +956,6 @@ class _NextCare extends StatelessWidget {
                   Text(
                     instructions,
                     style: AppText.bodyLarge.copyWith(color: AppColors.body),
-                  ),
-                ],
-                if (_cycle case final progress?) ...[
-                  const SizedBox(height: 12),
-                  _Meter(progress: progress),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Since the last watering',
-                    style: AppText.caption.copyWith(color: AppColors.body),
                   ),
                 ],
               ],
@@ -794,40 +1007,6 @@ class _NextCare extends StatelessWidget {
     );
   }
 
-  /// How far the plant is through its watering interval, 0 to 1.
-  ///
-  /// Null until both the cadence and a first watering exist, which is the
-  /// usual state for a plant added a minute ago.
-  double? get _cycle {
-    final interval = waterTask?.intervalDays;
-    final last = plant.currentCare.lastWateredAt;
-    if (interval == null || interval <= 0 || last == null) {
-      return null;
-    }
-    final elapsed = now.difference(last).inHours / 24;
-    return (elapsed / interval).clamp(0, 1).toDouble();
-  }
-}
-
-class _Meter extends StatelessWidget {
-  const _Meter({required this.progress});
-
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppSizes.pill),
-      child: SizedBox(
-        height: 7,
-        child: LinearProgressIndicator(
-          value: progress,
-          backgroundColor: AppColors.track,
-          valueColor: const AlwaysStoppedAnimation(AppColors.terracotta),
-        ),
-      ),
-    );
-  }
 }
 
 /// Watering and light only. The catalog has more, but the rest is reference

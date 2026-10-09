@@ -670,6 +670,9 @@ const _stageCopy = <PlantAgeStage, ({String label, String hint})>{
 /// Garden labels for anything outside the flow that shows a plant's spot.
 String gardenSpotLabel(GardenSpot spot) => _gardenCopy[spot]!.label;
 
+/// The second line under a garden, such as "A room, on a sill or a shelf".
+String gardenSpotHint(GardenSpot spot) => _gardenCopy[spot]!.hint;
+
 /// Stage labels, for the same reason.
 String plantStageLabel(PlantAgeStage stage) =>
     _stageCopy[stage]?.label ?? 'Unknown';

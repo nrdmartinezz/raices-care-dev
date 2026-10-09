@@ -60,6 +60,10 @@ abstract final class AppIcons {
   // The plant profile.
   static const profileAddedCheck = 'assets/icons/profile_added_check.svg';
   static const profileDismiss = 'assets/icons/profile_dismiss.svg';
+  static const statPlace = 'assets/icons/stat_place.svg';
+  static const statAge = 'assets/icons/stat_age.svg';
+  static const statGrowth = 'assets/icons/stat_growth.svg';
+  static const statusDroplets = 'assets/icons/status_droplets.svg';
   static const statGarden = 'assets/icons/stat_garden.svg';
   static const statStage = 'assets/icons/stat_stage.svg';
   static const actionLogWatering = 'assets/icons/action_log_watering.svg';

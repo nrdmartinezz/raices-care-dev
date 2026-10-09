@@ -190,7 +190,73 @@ class WorkerBackend {
       body: body,
       idempotencyKey: id,
     );
+    if (event.eventType == CareEventType.watered) {
+      await _advanceWatering(plantId, event.occurredAt);
+    }
     await _flushQuietly();
+    if (event.eventType == CareEventType.watered) {
+      final pending = await _database.pending();
+      final saved = pending.every((operation) => operation.id != 'care-$id');
+      if (saved) {
+        await _pullPlants();
+        await _pullReminders();
+      }
+    }
+  }
+
+  /// Moves the cached plant and its water reminder forward so today's chore
+  /// disappears before the server copy comes back.
+  Future<void> _advanceWatering(String plantId, DateTime occurredAt) async {
+    final reminders = await _database.watchCollection('reminders').first;
+    var intervalDays = 7;
+    for (final row in reminders) {
+      final json = _json(row.payload);
+      if (json['plantId'] != plantId || json['taskType'] != 'water_check') {
+        continue;
+      }
+      final interval = json['intervalDays'];
+      if (interval is num && interval > 0) intervalDays = interval.toInt();
+    }
+    final next = occurredAt.add(Duration(days: intervalDays));
+    final nextIso = next.toUtc().toIso8601String();
+    final occurredIso = occurredAt.toUtc().toIso8601String();
+
+    final plantRow = await _database.readDocument('plants', plantId);
+    if (plantRow != null) {
+      final json = _json(plantRow.payload);
+      json['lastWateredAt'] = occurredIso;
+      json['nextWaterCheckAt'] = nextIso;
+      await _database.saveDocument(
+        collection: 'plants',
+        id: plantId,
+        parentId: plantRow.parentId,
+        payload: jsonEncode(json),
+      );
+    }
+
+    final canonicalId = '${plantId}__water_check';
+    for (final row in reminders) {
+      final json = _json(row.payload);
+      if (json['plantId'] != plantId || json['taskType'] != 'water_check') {
+        continue;
+      }
+      if (row.id == canonicalId) {
+        json['dueAt'] = nextIso;
+        json['status'] = 'open';
+        json['completedAt'] = occurredIso;
+      } else if (json['status'] == null || json['status'] == 'open') {
+        json['status'] = 'completed';
+        json['completedAt'] = occurredIso;
+      } else {
+        continue;
+      }
+      await _database.saveDocument(
+        collection: 'reminders',
+        id: row.id,
+        parentId: row.parentId,
+        payload: jsonEncode(json),
+      );
+    }
   }
 
   Stream<List<CareEvent>> watchHistory(String plantId, {int limit = 50}) {
@@ -677,6 +743,8 @@ class WorkerBackend {
       gardenId: _spot(json['gardenId'] as String?),
       locationType: LocationType.fromWire(json['locationType']),
       speciesNameSnapshot: json['speciesName'] as String?,
+      acquiredAt: _time(json['acquiredAt']),
+      plantedAt: _time(json['plantedAt']),
       status: PlantStatus(
         health: PlantHealth.fromWire(json['health']),
         isArchived: archivedAt != null,

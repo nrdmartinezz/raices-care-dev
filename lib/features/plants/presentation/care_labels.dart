@@ -17,6 +17,74 @@ String dueLabel(DateTime dueAt, {required DateTime now}) {
   };
 }
 
+/// True when [lastWateredAt] falls on the same local calendar day as [now].
+bool wateredToday(DateTime? lastWateredAt, DateTime now) {
+  if (lastWateredAt == null) return false;
+  return _sameDay(lastWateredAt, now);
+}
+
+/// "2 yrs 4 mos", "3 mos", or "12 days" from [from] until [now].
+String estimatedAgeLabel(DateTime from, DateTime now) {
+  final start = DateTime(from.year, from.month, from.day);
+  final end = DateTime(now.year, now.month, now.day);
+  if (end.isBefore(start)) return 'Not set';
+
+  var years = end.year - start.year;
+  var months = end.month - start.month;
+  if (end.day < start.day) months -= 1;
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  if (years <= 0 && months <= 0) {
+    final days = end.difference(start).inDays;
+    if (days <= 0) return 'Today';
+    return days == 1 ? '1 day' : '$days days';
+  }
+  if (years <= 0) return months == 1 ? '1 mo' : '$months mos';
+  final yearLabel = years == 1 ? '1 yr' : '$years yrs';
+  if (months <= 0) return yearLabel;
+  final monthLabel = months == 1 ? '1 mo' : '$months mos';
+  return '$yearLabel $monthLabel';
+}
+
+/// "Last watered today" or "Last watered Oct 21".
+String lastWateredCaption(DateTime? lastWateredAt, DateTime now) {
+  if (lastWateredAt == null) return 'Not watered yet';
+  if (_sameDay(lastWateredAt, now)) return 'Last watered today';
+  return 'Last watered ${_monthDay(lastWateredAt)}';
+}
+
+/// "Next check Oct 28".
+String nextCheckLabel(DateTime at) => 'Next check ${_monthDay(at)}';
+
+bool _sameDay(DateTime a, DateTime b) {
+  final left = a.toLocal();
+  final right = b.toLocal();
+  return left.year == right.year &&
+      left.month == right.month &&
+      left.day == right.day;
+}
+
+String _monthDay(DateTime at) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  final local = at.toLocal();
+  return '${months[local.month - 1]} ${local.day}';
+}
+
 /// "TODAY", "YESTERDAY", "4 DAYS AGO", then a plain date.
 String writtenLabel(DateTime at, {required DateTime now}) {
   final days = DateTime(

@@ -206,7 +206,7 @@ class _Hub extends StatelessWidget {
     final today = _dateOnly(now);
     final focus = day ?? today;
     final all = [...schedule.overdue, ...schedule.today, ...schedule.later];
-    final wateringNow = _wateringDue(all: all, plants: plants, now: now);
+    final wateringNow = wateringDue(all: all, plants: plants, now: now);
     final wateringNowIds = {for (final chore in wateringNow) chore.reminder.id};
     final visible = _visibleChores(
       schedule: schedule,
@@ -1340,54 +1340,6 @@ List<GardenChore> _choresForDay({
   ];
 }
 
-/// Watering that still needs doing today: a due water reminder, a plant whose
-/// next watering has arrived, or a plant that has never been watered.
-List<GardenChore> _wateringDue({
-  required List<GardenChore> all,
-  required List<Plant> plants,
-  required DateTime now,
-}) {
-  final chores = <GardenChore>[];
-  final covered = <String>{};
-  for (final chore in all) {
-    if (chore.reminder.taskType != ReminderTaskType.waterCheck) {
-      continue;
-    }
-    final scheduled = choreWhen(chore.reminder.dueAt, now) != ChoreWhen.later;
-    if (scheduled || _needsWatering(chore.plant, now)) {
-      chores.add(chore);
-      covered.add(chore.plant.id);
-    }
-  }
-  for (final plant in plants) {
-    if (covered.contains(plant.id) || !_needsWatering(plant, now)) {
-      continue;
-    }
-    chores.add(
-      GardenChore(
-        reminder: Reminder(
-          id: 'water:${plant.id}',
-          plantId: plant.id,
-          speciesId: plant.speciesId,
-          taskType: ReminderTaskType.waterCheck,
-          title: 'Water ${plant.displayName}',
-          dueAt: now,
-        ),
-        plant: plant,
-      ),
-    );
-  }
-  return chores;
-}
-
-bool _needsWatering(Plant plant, DateTime now) {
-  final next = plant.nextActions.nextWaterCheckAt;
-  if (next != null) {
-    return !next.isAfter(now);
-  }
-  return plant.currentCare.lastWateredAt == null;
-}
-
 int _dueTodayCount(GardenSchedule schedule, List<GardenChore> wateringNow) {
   final ids = {
     for (final chore in [...schedule.today, ...schedule.overdue])
@@ -1511,7 +1463,7 @@ String _subtitle(GardenChore chore, DateTime now) {
   final due = chore.reminder.dueAt;
   final needsWater =
       chore.reminder.taskType == ReminderTaskType.waterCheck &&
-      _needsWatering(chore.plant, now);
+      needsWatering(chore.plant, now);
   final when = needsWater
       ? 'Due today'
       : choreWhen(due, now) == ChoreWhen.later

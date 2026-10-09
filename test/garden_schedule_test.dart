@@ -5,6 +5,7 @@ import 'package:raices/features/care/domain/care_event.dart';
 import 'package:raices/features/care/domain/care_task_type.dart';
 import 'package:raices/features/care/domain/reminder.dart';
 import 'package:raices/features/plants/domain/plant.dart';
+import 'package:raices/features/plants/presentation/care_labels.dart';
 
 void main() {
   test('care events cover the recurring chores', () {
@@ -54,8 +55,13 @@ void main() {
       ],
     );
 
-    expect(schedule.today.map((chore) => chore.reminder.id), ['water']);
-    expect(schedule.later, isEmpty);
+    expect(schedule.later.map((chore) => chore.reminder.id), ['water']);
+    final due = wateringDue(
+      all: [...schedule.overdue, ...schedule.today, ...schedule.later],
+      plants: [_plant('celery')],
+      now: now,
+    );
+    expect(due.map((chore) => chore.reminder.id), ['water']);
   });
 
   test('a recent watering keeps the next check for later', () {
@@ -76,13 +82,62 @@ void main() {
     expect(schedule.today, isEmpty);
     expect(schedule.later.map((chore) => chore.reminder.id), ['water']);
   });
+
+  test('watered today is not due again until tomorrow', () {
+    final morning = DateTime(2026, 10, 8, 9);
+    final evening = DateTime(2026, 10, 8, 21);
+    expect(wateredToday(evening, morning), isTrue);
+    expect(wateredToday(evening, DateTime(2026, 10, 9, 8)), isFalse);
+    expect(wateredToday(null, morning), isFalse);
+  });
+
+  test('estimated age counts years, months, then days', () {
+    final now = DateTime(2026, 10, 8);
+    expect(estimatedAgeLabel(DateTime(2024, 6, 8), now), '2 yrs 4 mos');
+    expect(estimatedAgeLabel(DateTime(2026, 7, 8), now), '3 mos');
+    expect(estimatedAgeLabel(DateTime(2026, 9, 26), now), '12 days');
+  });
+
+  test('a plant watered today with a future check is not on today\'s list', () {
+    final now = DateTime(2026, 10, 8, 9);
+    final plant = _plant(
+      'basil',
+      lastWateredAt: now,
+      nextWaterCheckAt: DateTime(2026, 10, 15, 9),
+    );
+    final schedule = gardenScheduleFrom(
+      now: now,
+      plants: [plant],
+      reminders: [
+        _reminder(
+          'basil__water_check',
+          plantId: 'basil',
+          dueAt: DateTime(2026, 10, 15, 9),
+          intervalDays: 7,
+        ),
+      ],
+    );
+    final listed = wateringDue(
+      all: [...schedule.overdue, ...schedule.today, ...schedule.later],
+      plants: [plant],
+      now: now,
+    );
+
+    expect(schedule.today, isEmpty);
+    expect(listed, isEmpty);
+  });
 }
 
-Plant _plant(String id, {DateTime? lastWateredAt}) => Plant(
+Plant _plant(
+  String id, {
+  DateTime? lastWateredAt,
+  DateTime? nextWaterCheckAt,
+}) => Plant(
   id: id,
   speciesId: 'species',
   displayName: id,
   currentCare: PlantCurrentCare(lastWateredAt: lastWateredAt),
+  nextActions: PlantNextActions(nextWaterCheckAt: nextWaterCheckAt),
 );
 
 Reminder _reminder(
