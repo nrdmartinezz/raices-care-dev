@@ -114,19 +114,19 @@ void main() {
     expect(find.text('Home'), findsOneWidget);
   });
 
-  testWidgets('profile opens support with bug reports and Patreon', (
+  testWidgets('profile opens support with bug reports and Ko-fi', (
     tester,
   ) async {
     _usePhoneSurface(tester);
     await _openProfile(tester);
 
     expect(
-      find.text('Report a bug or support the app on Patreon'),
+      find.text('Report a bug or support the app on Ko-fi'),
       findsOneWidget,
     );
     expect(
       find.text(
-        'Opens a separate support screen with bug reporting and Patreon '
+        'Opens a separate support screen with bug reporting and Ko-fi '
         'support options.',
       ),
       findsOneWidget,
@@ -145,7 +145,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Report a bug'), findsNWidgets(2));
-    expect(find.text('Support on Patreon'), findsNWidgets(2));
+    expect(find.text('Support on Ko-fi'), findsNWidgets(2));
     expect(find.text('Thank you for helping Raíces grow.'), findsOneWidget);
     expect(find.text('Home'), findsOneWidget);
   });

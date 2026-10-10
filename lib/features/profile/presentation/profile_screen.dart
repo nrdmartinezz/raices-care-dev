@@ -130,7 +130,7 @@ class _ProfileBody extends StatelessWidget {
           const _SupportEntry(),
           const SizedBox(height: 10),
           Text(
-            'Opens a separate support screen with bug reporting and Patreon '
+            'Opens a separate support screen with bug reporting and Ko-fi '
             'support options.',
             style: AppText.caption.copyWith(color: AppColors.body),
           ),
@@ -470,7 +470,7 @@ class _SupportEntry extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Report a bug or support the app on Patreon',
+                      'Report a bug or support the app on Ko-fi',
                       style: AppText.body.copyWith(color: AppColors.body),
                     ),
                   ],

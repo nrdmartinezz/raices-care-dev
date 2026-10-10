@@ -8,7 +8,7 @@ import '../../../app/theme.dart';
 import 'account_widgets.dart';
 import 'support_links.dart';
 
-/// Bug reports and optional Patreon support, opened from the profile.
+/// Bug reports and optional Ko-fi support, opened from the profile.
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
 
@@ -64,14 +64,14 @@ class _SupportScreenState extends State<SupportScreen> {
             const SizedBox(height: AppSizes.sectionGap),
             _SupportCard(
               icon: AppIcons.supportHeart,
-              title: 'Support on Patreon',
+              title: 'Support on Ko-fi',
               body: 'Help nurture Raíces. Your support helps us care for the app and bring new features to life.',
-              actionLabel: 'Support on Patreon',
+              actionLabel: 'Support on Ko-fi',
               actionIcon: AppIcons.supportExternal,
               footnote:
-                  'Opens Patreon in your browser. Support is always optional.',
-              failed: _failedUrl == SupportLinks.patreon,
-              onPressed: () => _open(SupportLinks.patreon),
+                  'Opens Ko-fi in your browser. Support is always optional.',
+              failed: _failedUrl == SupportLinks.kofi,
+              onPressed: () => _open(SupportLinks.kofi),
             ),
             const SizedBox(height: AppSizes.sectionGap),
             const _Appreciation(),
