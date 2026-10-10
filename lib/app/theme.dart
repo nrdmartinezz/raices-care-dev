@@ -43,8 +43,6 @@ abstract final class AppColors {
   /// where [terracotta] would not be.
   static const accentAmber = Color(0xFFFABC4D);
 
-  /// The version line under the dedication: present, but barely.
-  static const footerFaint = Color(0xFFDEC0B7);
 }
 
 /// Text styles from the design. Colour is applied at the call site so a single
