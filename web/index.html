@@ -19,6 +19,7 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Care for the plants in your garden. Add each one, see what needs attention, and keep a record of how you tend them.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#3A6758">
   <link rel="canonical" href="https://app.raices.care/">
 
@@ -51,6 +52,24 @@
 
   <title>Raíces</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    The phone browser must not scroll the document. When the add-plant
+    search reaches its last result, leftover scroll was handed to the
+    page and the tab reloaded.
+  -->
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+
+    flt-glass-pane {
+      overscroll-behavior: none;
+    }
+  </style>
 </head>
 <body>
   <!--
