@@ -53,8 +53,7 @@ class NotFoundException extends AppException {
 
 class NetworkException extends AppException {
   const NetworkException([
-    super.message =
-        'No connection. Changes will sync when you are back online.',
+    super.message = 'No connection. Try again when you are back online.',
     Object? cause,
     StackTrace? stackTrace,
   ]) : super(cause: cause, stackTrace: stackTrace);

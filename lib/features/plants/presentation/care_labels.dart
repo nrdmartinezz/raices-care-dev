@@ -23,6 +23,40 @@ bool wateredToday(DateTime? lastWateredAt, DateTime now) {
   return _sameDay(lastWateredAt, now);
 }
 
+/// Years and months between [from] and [now], matching [estimatedAgeLabel].
+({int years, int months}) ageParts(DateTime from, DateTime now) {
+  final start = DateTime(from.year, from.month, from.day);
+  final end = DateTime(now.year, now.month, now.day);
+  if (end.isBefore(start)) return (years: 0, months: 0);
+  var years = end.year - start.year;
+  var months = end.month - start.month;
+  if (end.day < start.day) months -= 1;
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  if (years < 0) return (years: 0, months: 0);
+  return (years: years, months: months);
+}
+
+/// The day a plant would have started, given an age of [years] and [months]
+/// as of [now]. Used when the gardener edits the age.
+DateTime ageAnchorFromParts({
+  required DateTime now,
+  required int years,
+  required int months,
+}) {
+  var year = now.year - years;
+  var month = now.month - months;
+  while (month < 1) {
+    month += 12;
+    year -= 1;
+  }
+  final lastDay = DateTime(year, month + 1, 0).day;
+  final day = now.day > lastDay ? lastDay : now.day;
+  return DateTime(year, month, day);
+}
+
 /// "2 yrs 4 mos", "3 mos", or "12 days" from [from] until [now].
 String estimatedAgeLabel(DateTime from, DateTime now) {
   final start = DateTime(from.year, from.month, from.day);
@@ -99,6 +133,15 @@ String writtenLabel(DateTime at, {required DateTime now}) {
     _ => '${at.day}/${at.month}/${at.year}',
   };
 }
+
+/// Trefle grades humidity 0–10.
+String? humidityLabel(int? humidity) => switch (humidity) {
+  null => null,
+  >= 8 => 'High humidity',
+  >= 5 => 'Moderate humidity',
+  >= 3 => 'Average indoor air',
+  _ => 'Dry air is fine',
+};
 
 /// Trefle grades light 0–10, where 10 is full sun.
 String lightLabel(int? light) => switch (light) {

@@ -11,6 +11,8 @@ import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/plants/data/species_repository.dart';
 import '../features/plants/presentation/add_plant_screen.dart';
+import '../features/plants/presentation/edit_care_guide_screen.dart';
+import '../features/plants/presentation/edit_plant_screen.dart';
 import '../features/plants/presentation/my_plants_screen.dart';
 import '../features/plants/presentation/plant_detail_screen.dart';
 import '../features/profile/presentation/account_settings_screen.dart';
@@ -49,6 +51,16 @@ abstract final class MyPlantsRoute {
 abstract final class PlantDetailRoute {
   static const name = 'plantDetail';
   static const path = ':plantId';
+}
+
+abstract final class PlantEditRoute {
+  static const name = 'plantEdit';
+  static const path = 'edit';
+}
+
+abstract final class PlantCareGuideRoute {
+  static const name = 'plantCareGuide';
+  static const path = 'care';
 }
 
 abstract final class ChoresRoute {
@@ -205,6 +217,30 @@ final routerProvider = Provider<GoRouter>((ref) {
                             isNew: state.uri.queryParameters['new'] == '1',
                           ),
                         ),
+                        routes: [
+                          GoRoute(
+                            path: PlantEditRoute.path,
+                            name: PlantEditRoute.name,
+                            pageBuilder: (context, state) => _slidePage(
+                              key: state.pageKey,
+                              from: _SlideFrom.end,
+                              child: EditPlantScreen(
+                                plantId: state.pathParameters['plantId']!,
+                              ),
+                            ),
+                          ),
+                          GoRoute(
+                            path: PlantCareGuideRoute.path,
+                            name: PlantCareGuideRoute.name,
+                            pageBuilder: (context, state) => _slidePage(
+                              key: state.pageKey,
+                              from: _SlideFrom.end,
+                              child: EditCareGuideScreen(
+                                plantId: state.pathParameters['plantId']!,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

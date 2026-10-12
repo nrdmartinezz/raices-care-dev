@@ -82,6 +82,7 @@ class AppDatabase extends _$AppDatabase {
               'care_events',
               'reminders',
               'photos',
+              'journal',
               'tokens',
               'gardens',
               'frost',

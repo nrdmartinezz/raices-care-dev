@@ -121,6 +121,7 @@ meRoutes.delete("/v1/me", async (c) => {
     c.env.DB.prepare("UPDATE plants SET deleted_at = ?, updated_at = ? WHERE user_id = ? AND deleted_at IS NULL").bind(ts, ts, userId),
     c.env.DB.prepare("UPDATE reminders SET deleted_at = ?, updated_at = ? WHERE user_id = ? AND deleted_at IS NULL").bind(ts, ts, userId),
     c.env.DB.prepare("UPDATE care_events SET deleted_at = ? WHERE user_id = ? AND deleted_at IS NULL").bind(ts, userId),
+    c.env.DB.prepare("UPDATE journal_entries SET deleted_at = ?, updated_at = ? WHERE user_id = ? AND deleted_at IS NULL").bind(ts, ts, userId),
     c.env.DB.prepare("UPDATE photos SET deleted_at = ? WHERE user_id = ? AND deleted_at IS NULL").bind(ts, userId),
     c.env.DB.prepare("DELETE FROM device_tokens WHERE user_id = ?").bind(userId),
     c.env.DB.prepare("DELETE FROM notification_deliveries WHERE user_id = ?").bind(userId),

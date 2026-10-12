@@ -23,7 +23,8 @@ class AuthRepository {
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
-  final Future<void> Function({String? displayName, String? email})? _syncAccount;
+  final Future<void> Function({String? displayName, String? email})?
+  _syncAccount;
 
   /// Worker rows, while the ID token can still authorize the request.
   final Future<void> Function()? _deleteRemoteAccount;
@@ -171,7 +172,7 @@ class AuthRepository {
         throw const UnauthenticatedException();
       }
 
-      await _syncAccount?.call(displayName: user.displayName, email: user.email);
+      await _mirrorAccount(displayName: user.displayName, email: user.email);
 
       final ref = _profileRef(user.uid);
       if ((await ref.get()).exists) {
@@ -200,9 +201,27 @@ class AuthRepository {
 
   Future<void> updateProfile(AppUser user) {
     return guardFirebase(() async {
-      await _syncAccount?.call(displayName: user.displayName, email: user.email);
-      await _profileRef(user.id).set(user.toUpdateJson(), SetOptions(merge: true));
+      await _mirrorAccount(displayName: user.displayName, email: user.email);
+      await _profileRef(user.id)
+          .set(user.toUpdateJson(), SetOptions(merge: true));
     });
+  }
+
+  /// Sends name and email to the worker, then lets the caller write Firestore.
+  ///
+  /// Experience, the zone, and the rest of the profile live on the document
+  /// the app reads. A dropped worker call, common on mobile Chrome, must not
+  /// block that write or onboarding stays on this step forever.
+  Future<void> _mirrorAccount({String? displayName, String? email}) async {
+    final sync = _syncAccount;
+    if (sync == null) {
+      return;
+    }
+    try {
+      await sync(displayName: displayName, email: email);
+    } on NetworkException {
+      return;
+    }
   }
 
   /// Keeps the auth account's name in step with the profile document.

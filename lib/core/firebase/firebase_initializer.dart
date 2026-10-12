@@ -20,6 +20,18 @@ abstract final class FirebaseInitializer {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
+    if (kIsWeb) {
+      // Phone browsers, Chrome on iOS included, are WebKit. Firestore's
+      // default streaming connection dies there, and the SDK then reports
+      // the client as offline. Onboarding shows that as "No connection"
+      // even though the page itself loaded. Long polling is the transport
+      // those browsers keep open. It has to be set before any other
+      // Firestore call, including the emulator hook below.
+      FirebaseFirestore.instance.settings = const Settings(
+        webExperimentalForceLongPolling: true,
+      );
+    }
+
     if (useFirebaseEmulators) {
       // App Check is skipped here: the debug provider still calls the live
       // App Check backend, which defeats the point of running offline.

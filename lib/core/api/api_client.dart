@@ -6,6 +6,32 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../errors/app_exception.dart';
 import 'api_config.dart';
 
+/// A status-0 failure on an idempotent call is worth one more try.
+///
+/// Chrome on a phone often fails the first cross-origin request and then
+/// succeeds. POST is included only when it carries an idempotency key, so a
+/// retry cannot create a second plant or care event.
+bool shouldRetryTransportFailure(DioException error) {
+  if (error.response != null || error.error is AppException) {
+    return false;
+  }
+  final dropped =
+      error.type == DioExceptionType.connectionError ||
+      error.type == DioExceptionType.unknown;
+  if (!dropped) {
+    return false;
+  }
+  final method = error.requestOptions.method.toUpperCase();
+  if (method == 'GET' ||
+      method == 'HEAD' ||
+      method == 'PUT' ||
+      method == 'DELETE') {
+    return true;
+  }
+  final key = error.requestOptions.headers['Idempotency-Key'];
+  return key is String && key.isNotEmpty;
+}
+
 /// Talks to the Worker. Every request carries the current Firebase ID token.
 class ApiClient {
   ApiClient({Dio? dio, required this._auth, Uri? baseUrl})
@@ -47,7 +73,9 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? query,
   }) async {
-    final response = await _send(() => _dio.get<dynamic>(path, queryParameters: query));
+    final response = await _send(
+      () => _dio.get<dynamic>(path, queryParameters: query),
+    );
     return _object(response.data);
   }
 
@@ -64,10 +92,7 @@ class ApiClient {
         data: body,
         options: Options(
           method: method,
-          headers: {
-            'Idempotency-Key': ?idempotencyKey,
-            'If-Match': ?ifMatch,
-          },
+          headers: {'Idempotency-Key': ?idempotencyKey, 'If-Match': ?ifMatch},
         ),
       ),
     );
@@ -105,16 +130,30 @@ class ApiClient {
     return _object(response.data);
   }
 
-  Future<Response<T>> _send<T>(Future<Response<T>> Function() request) async {
+  Future<Response<T>> _send<T>(Future<Response<T>> Function() request) {
+    return _attempt(request, allowRetry: true);
+  }
+
+  Future<Response<T>> _attempt<T>(
+    Future<Response<T>> Function() request, {
+    required bool allowRetry,
+  }) async {
     try {
       return await request();
     } on DioException catch (dioError) {
       final wrapped = dioError.error;
       if (wrapped is AppException) throw wrapped;
+      // Mobile Chrome often drops the first cross-origin call (a status-0
+      // "Load failed") and accepts the next one. Only idempotent calls are
+      // retried, so a lost response cannot create a second record.
+      if (allowRetry && shouldRetryTransportFailure(dioError)) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        return _attempt(request, allowRetry: false);
+      }
       final response = dioError.response;
       if (response == null) {
         throw NetworkException(
-          'No connection. Changes will sync when you are back online.',
+          'No connection. Try again when you are back online.',
           dioError,
         );
       }
@@ -141,10 +180,7 @@ class ApiClient {
         _ when code == 'validation_error' => MalformedDataException(
           message ?? 'That request is not valid.',
         ),
-        _ => UnexpectedException(
-          message ?? 'Something went wrong.',
-          dioError,
-        ),
+        _ => UnexpectedException(message ?? 'Something went wrong.', dioError),
       };
     }
   }

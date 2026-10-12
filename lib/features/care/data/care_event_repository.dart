@@ -51,6 +51,16 @@ class CareEventRepository {
         .map((snapshot) => snapshot.docs.map(CareEvent.fromFirestore).toList());
   }
 
+  /// Corrects the date or note. The Worker stores the change on the same row.
+  Future<void> updateEvent({
+    required String plantId,
+    required CareEvent event,
+  }) {
+    throw const UnexpectedException(
+      'Watering corrections are saved with the garden API.',
+    );
+  }
+
   /// Removes a mistaken entry.
   ///
   /// The rules allow deletes but not updates, so correcting an event means
@@ -76,6 +86,15 @@ class CareEventRepository {
         .collection('careEvents');
   }
 }
+
+final wateringLogProvider = StreamProvider.family<List<CareEvent>, String>((
+  ref,
+  plantId,
+) {
+  return ref
+      .watch(careEventRepositoryProvider)
+      .watchHistoryOfType(plantId, CareEventType.watered);
+});
 
 final careEventRepositoryProvider = Provider<CareEventRepository>((ref) {
   final userId = ref.watch(currentUserIdProvider);

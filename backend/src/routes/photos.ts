@@ -82,11 +82,15 @@ photoRoutes.delete("/v1/photos/:photoId", async (c) => {
   const row = await loadPhoto(c.env.DB, userId, photoId);
   const ts = now();
   await c.env.IMAGES.delete(row.object_key);
-  await c.env.DB.prepare(
-    "UPDATE photos SET deleted_at = ?, object_key = '' WHERE id = ? AND user_id = ?",
-  )
-    .bind(ts, photoId, userId)
-    .run();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      "UPDATE photos SET deleted_at = ?, object_key = '' WHERE id = ? AND user_id = ?",
+    ).bind(ts, photoId, userId),
+    c.env.DB.prepare(
+      `UPDATE plants SET cover_photo_id = NULL, updated_at = ?, revision = revision + 1
+       WHERE user_id = ? AND cover_photo_id = ?`,
+    ).bind(ts, userId, photoId),
+  ]);
   return c.body(null, 204);
 });
 
