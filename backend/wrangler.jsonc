@@ -14,9 +14,9 @@
   "vars": {
     "FIREBASE_PROJECT_ID": "raices-care",
     "ENVIRONMENT": "production",
-    "DRY_RUN_PUSH": "true",
+    "DRY_RUN_PUSH": "false",
     "APP_CHECK_ENFORCE": "false",
-    "ALLOWED_ORIGINS": ""
+    "ALLOWED_ORIGINS": "https://app.raices.care"
   },
   "d1_databases": [
     {

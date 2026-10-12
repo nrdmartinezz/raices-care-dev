@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/assets.dart';
+import '../../../app/layout.dart';
 import '../../../app/router.dart';
 import '../../../app/shell/app_shell.dart';
 import '../../../app/theme.dart';
@@ -15,6 +16,7 @@ import '../domain/garden_spot.dart';
 import '../domain/plant.dart';
 import 'add_plant_flow.dart';
 import 'care_labels.dart';
+import 'desktop_catalog.dart';
 
 /// Tab 2 — the whole garden, one card per plant.
 ///
@@ -28,6 +30,33 @@ class MyPlantsScreen extends ConsumerWidget {
     final plantsAsync = ref.watch(activePlantsProvider);
     final nextByPlant = ref.watch(nextReminderByPlantProvider);
     final now = ref.watch(nowProvider);
+
+    if (AppLayout.isWide(context)) {
+      final plants = plantsAsync.value;
+      final failed =
+          plantsAsync.hasError && (plants == null || plants.isEmpty);
+      return ShellScrollView(
+        child: failed
+            ? Text(
+                'Your plants could not load. Try again in a moment.',
+                style: AppText.bodyLarge.copyWith(color: AppColors.body),
+              )
+            : plants == null
+            ? const Padding(
+                padding: EdgeInsets.only(top: 40),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : DesktopPlantCatalog(
+                plants: plants,
+                nextByPlant: nextByPlant,
+                now: now,
+                onOpen: (plantId) => context.goNamed(
+                  PlantDetailRoute.name,
+                  pathParameters: {'plantId': plantId},
+                ),
+              ),
+      );
+    }
 
     return ShellScrollView(
       child: Column(

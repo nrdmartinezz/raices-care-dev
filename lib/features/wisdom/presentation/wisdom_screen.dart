@@ -4,8 +4,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/assets.dart';
+import '../../../app/layout.dart';
 import '../../../app/router.dart';
 import '../../../app/shell/app_shell.dart';
+import '../../../app/shell/desktop_header_actions.dart';
 import '../../../app/theme.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../planting/data/planting_repository.dart';
@@ -135,17 +137,20 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
   @override
   Widget build(BuildContext context) {
     if (_filtering) {
+      final wide = AppLayout.isWide(context);
       final insets = MediaQuery.paddingOf(context);
       return SearchFiltersView(
         filters: _filters,
         onBack: () => setState(() => _filtering = false),
         onApply: _applyFilters,
-        padding: EdgeInsets.fromLTRB(
-          AppSizes.screenPadding,
-          AppSizes.headerHeight + insets.top + 12,
-          AppSizes.screenPadding,
-          AppSizes.navHeight + insets.bottom,
-        ),
+        padding: wide
+            ? const EdgeInsets.fromLTRB(32, 24, 32, 32)
+            : EdgeInsets.fromLTRB(
+                AppSizes.screenPadding,
+                AppSizes.headerHeight + insets.top + 12,
+                AppSizes.screenPadding,
+                AppSizes.navHeight + insets.bottom,
+              ),
       );
     }
 
@@ -169,17 +174,17 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'GROWING LORE',
-            style: AppText.eyebrow.copyWith(color: AppColors.green),
-          ),
-          const SizedBox(height: 7),
-          Text('Wisdom', style: AppText.display.copyWith(color: AppColors.ink)),
-          const SizedBox(height: 7),
-          Text(
-            'Look up a plant before you bring it home.',
-            style: AppText.bodyLarge.copyWith(color: AppColors.body),
-          ),
+          if (AppLayout.isWide(context))
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _WisdomIntro()),
+                SizedBox(width: 16),
+                DesktopHeaderActions(),
+              ],
+            )
+          else
+            const _WisdomIntro(),
           const SizedBox(height: AppSizes.sectionGap),
           ref
               .watch(gardenFrostProvider)
@@ -255,6 +260,30 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _WisdomIntro extends StatelessWidget {
+  const _WisdomIntro();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'GROWING LORE',
+          style: AppText.eyebrow.copyWith(color: AppColors.green),
+        ),
+        const SizedBox(height: 7),
+        Text('Wisdom', style: AppText.display.copyWith(color: AppColors.ink)),
+        const SizedBox(height: 7),
+        Text(
+          'Look up a plant before you bring it home.',
+          style: AppText.bodyLarge.copyWith(color: AppColors.body),
+        ),
+      ],
     );
   }
 }

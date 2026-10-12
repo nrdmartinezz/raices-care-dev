@@ -20,6 +20,8 @@ abstract final class AppIcons {
   static const actionNewSprout = 'assets/icons/action_new_sprout.svg';
   static const actionAskElder = 'assets/icons/action_ask_elder.svg';
   static const navHome = 'assets/icons/nav_home.svg';
+  static const navHouse = 'assets/icons/nav_house.svg';
+  static const languageSwitcher = 'assets/icons/language_switcher.svg';
   static const navMyPlants = 'assets/icons/nav_my_plants.svg';
   static const navAdd = 'assets/icons/nav_add.svg';
   static const navChores = 'assets/icons/nav_chores.svg';

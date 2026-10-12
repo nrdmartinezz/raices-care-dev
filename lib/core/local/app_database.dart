@@ -30,7 +30,19 @@ class PendingOperations extends Table {
 
 @DriftDatabase(tables: [CachedDocuments, PendingOperations])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase([QueryExecutor? executor]) : super(executor ?? driftDatabase(name: 'raices'));
+  AppDatabase([QueryExecutor? executor])
+    : super(
+        executor ??
+            driftDatabase(
+              name: 'raices',
+              // Required on web. Without these files the database throws and
+              // the garden never reads the account's plants.
+              web: DriftWebOptions(
+                sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+                driftWorker: Uri.parse('drift_worker.js'),
+              ),
+            ),
+      );
 
   @override
   int get schemaVersion => 1;
