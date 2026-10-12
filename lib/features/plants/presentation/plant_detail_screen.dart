@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/assets.dart';
 import '../../../app/router.dart';
@@ -33,8 +34,8 @@ import 'care_labels.dart';
 /// One plant: what it is, where it lives, what it needs next, and the notes
 /// kept about it.
 ///
-/// Chores are opt-in. Adding the plant to the schedule writes reminders from
-/// its catalog care profile, and the open-reminder stream fills this page in.
+/// Chores come from the care saved on this plant. A new plant fills that in
+/// after it is created, and the gardener can change the cadence.
 class PlantDetailScreen extends ConsumerStatefulWidget {
   const PlantDetailScreen({
     super.key,
@@ -57,11 +58,20 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
   var _removing = false;
   var _scheduling = false;
   var _loggingWater = false;
+  var _loadingCare = false;
+  var _careAttempted = false;
   String? _error;
 
   @override
   Widget build(BuildContext context) {
     final plantAsync = ref.watch(plantProvider(widget.plantId));
+    ref.listen(plantProvider(widget.plantId), (previous, next) {
+      final plant = next.value;
+      if (plant == null || !widget.isNew || _careAttempted) return;
+      if (plant.careTasks.isNotEmpty) return;
+      _careAttempted = true;
+      _loadCare(plant.id);
+    });
 
     return ShellScrollView(
       // The plant wins over the spinner whenever one has arrived, since a
@@ -92,7 +102,7 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
     final profiles = ref.watch(careProfilesProvider(plant.speciesId)).value;
     final reminders =
         ref.watch(plantRemindersProvider(plant.id)).value ?? const <Reminder>[];
-    final waterTask = _waterTask(profiles);
+    final waterTask = _savedWater(plant) ?? _waterTask(profiles);
     // Every date on this screen is read as "how far from now", so the clock
     // comes from the provider the rest of the app pins in tests.
     final now = ref.watch(nowProvider);
@@ -146,7 +156,18 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
           _HarvestCountdown(days: remaining),
         ],
         const SizedBox(height: AppSizes.sectionGap),
-        _CareGuide(species: species, waterTask: waterTask, calendar: calendar),
+        _CareGuide(
+          species: species,
+          tasks: plant.careTasks,
+          waterTask: waterTask,
+          loading: _loadingCare && plant.careTasks.isEmpty,
+          calendar: calendar,
+          difficulty: plant.careDifficulty,
+          light: plant.careLight,
+          sourceUrl: plant.careSourceUrl,
+          sourceLabel: plant.careSourceLabel,
+          onEdit: plant.careTasks.isEmpty ? null : () => _editCare(plant),
+        ),
         const SizedBox(height: AppSizes.sectionGap),
         _Upcoming(reminders: reminders, now: now),
         const SizedBox(height: AppSizes.sectionGap),
@@ -175,6 +196,41 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
         ],
       ],
     );
+  }
+
+  CareProfileTask? _savedWater(Plant plant) {
+    for (final task in plant.careTasks) {
+      if (task.taskType == ReminderTaskType.waterCheck) return task;
+    }
+    return null;
+  }
+
+  Future<void> _loadCare(String plantId) async {
+    setState(() {
+      _loadingCare = true;
+      _error = null;
+    });
+    try {
+      await ref.read(plantRepositoryProvider).loadCare(plantId);
+    } on AppException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _loadingCare = false);
+    }
+  }
+
+  Future<void> _editCare(Plant plant) async {
+    final edited = await showDialog<List<CareProfileTask>>(
+      context: context,
+      builder: (context) => _CareEditDialog(tasks: plant.careTasks),
+    );
+    if (edited == null || !mounted) return;
+    setState(() => _error = null);
+    try {
+      await ref.read(plantRepositoryProvider).updateCare(plant.id, edited);
+    } on AppException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
   }
 
   /// The watering entry of the first care profile, which is what the catalog
@@ -565,8 +621,10 @@ class _Stats extends StatelessWidget {
               icon: AppIcons.statAge,
               iconWash: AppColors.surfaceBlush,
               background: AppColors.surfaceWarm,
-              value: born == null ? 'Not set' : estimatedAgeLabel(born, now),
-              caption: 'Estimated age',
+              value: plant.plantAgeStage == PlantAgeStage.unknown
+                  ? (born == null ? 'Not set' : estimatedAgeLabel(born, now))
+                  : plantStageLabel(plant.plantAgeStage),
+              caption: 'Age',
             ),
           ),
           const SizedBox(width: 8),
@@ -1045,48 +1103,234 @@ class _HarvestCountdown extends StatelessWidget {
 class _CareGuide extends StatelessWidget {
   const _CareGuide({
     required this.species,
+    required this.tasks,
     required this.waterTask,
+    required this.loading,
     required this.calendar,
+    required this.difficulty,
+    required this.light,
+    required this.sourceUrl,
+    required this.sourceLabel,
+    required this.onEdit,
   });
 
   final Species? species;
+  final List<CareProfileTask> tasks;
   final CareProfileTask? waterTask;
+  final bool loading;
   final SowingCalendar? calendar;
+  final String? difficulty;
+  final String? light;
+  final String? sourceUrl;
+  final String? sourceLabel;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
-    final interval = waterTask?.intervalDays;
+    final shown = tasks.isNotEmpty
+        ? tasks
+        : [if (waterTask != null) waterTask!];
+    final plantLight = light?.trim();
+    final level = difficulty?.trim();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeading(icon: AppIcons.careGuideHeading, title: 'Care guide'),
+        Row(
+          children: [
+            Expanded(
+              child: _SectionHeading(
+                icon: AppIcons.careGuideHeading,
+                title: 'Care guide',
+              ),
+            ),
+            if (onEdit != null)
+              TextButton(onPressed: onEdit, child: const Text('Edit')),
+          ],
+        ),
         if (calendar != null && calendar!.hasWindows) ...[
           const SizedBox(height: 10),
           SowingCalendarSection(calendar: calendar!),
         ],
         const SizedBox(height: 10),
-        _CareCard(
-          icon: AppIcons.careWatering,
-          label: 'WATERING',
-          value: interval == null
-              ? 'Being worked out'
-              : 'Every ${interval == 1 ? 'day' : '$interval days'}',
-          hint: waterTask == null
-              ? 'A cadence appears once the catalog record is ready.'
-              : waterTask!.isDefaultCadence
-              ? 'A starting point. Adjust it as you learn the plant.'
-              : waterTask!.instructions,
+        if (loading)
+          Text(
+            'Finding care advice…',
+            style: AppText.body.copyWith(color: AppColors.body),
+          )
+        else ...[
+          if (level != null && level.isNotEmpty) ...[
+            Text(
+              'Difficulty · ${_careLabel(level)}',
+              style: AppText.label.copyWith(color: AppColors.ink),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (shown.isEmpty)
+            _CareCard(
+              icon: AppIcons.careWatering,
+              label: 'WATERING',
+              value: 'Being worked out',
+              hint: 'A cadence appears once care is saved on this plant.',
+            )
+          else
+            for (final task in shown) ...[
+              _CareCard(
+                icon: _careIcon(task.taskType),
+                label: task.title.toUpperCase(),
+                value:
+                    'Every ${task.intervalDays == 1 ? 'day' : '${task.intervalDays} days'}',
+                hint: task.instructions?.trim().isNotEmpty == true
+                    ? task.instructions
+                    : 'A starting point. Adjust it as you learn the plant.',
+              ),
+              const SizedBox(height: 10),
+            ],
+          if (plantLight != null && plantLight.isNotEmpty)
+            _CareCard(
+              icon: AppIcons.careLight,
+              label: 'LIGHT',
+              value: plantLight,
+            )
+          else if (species != null)
+            _CareCard(
+              icon: AppIcons.careLight,
+              label: 'LIGHT',
+              value: lightLabel(species?.growth.light),
+              hint: species?.growth.light == null
+                  ? 'The catalog has no light reading for this species.'
+                  : null,
+            ),
+          if (sourceUrl case final url?) ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => launchUrl(
+                  Uri.parse(url),
+                  mode: LaunchMode.externalApplication,
+                ),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Care tips from ${sourceLabel ?? 'PlantSolve'}',
+                  style: AppText.caption.copyWith(color: AppColors.green),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+String _careLabel(String value) {
+  if (value.isEmpty) return value;
+  return value[0].toUpperCase() + value.substring(1);
+}
+
+String _careIcon(ReminderTaskType type) {
+  return switch (type) {
+    ReminderTaskType.waterCheck => AppIcons.careWatering,
+    ReminderTaskType.fertilize => AppIcons.careLight,
+    _ => AppIcons.careGuideHeading,
+  };
+}
+
+class _CareEditDialog extends StatefulWidget {
+  const _CareEditDialog({required this.tasks});
+
+  final List<CareProfileTask> tasks;
+
+  @override
+  State<_CareEditDialog> createState() => _CareEditDialogState();
+}
+
+class _CareEditDialogState extends State<_CareEditDialog> {
+  late final List<TextEditingController> _days = [
+    for (final task in widget.tasks)
+      TextEditingController(text: '${task.intervalDays}'),
+  ];
+  late final List<TextEditingController> _notes = [
+    for (final task in widget.tasks)
+      TextEditingController(text: task.instructions ?? ''),
+  ];
+  String? _error;
+
+  @override
+  void dispose() {
+    for (final controller in _days) {
+      controller.dispose();
+    }
+    for (final controller in _notes) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _save() {
+    final next = <CareProfileTask>[];
+    for (var index = 0; index < widget.tasks.length; index++) {
+      final days = int.tryParse(_days[index].text.trim());
+      if (days == null || days < 1 || days > 365) {
+        setState(() => _error = 'Use a number of days from 1 to 365.');
+        return;
+      }
+      final task = widget.tasks[index];
+      next.add(
+        CareProfileTask(
+          taskType: task.taskType,
+          title: task.title,
+          intervalDays: days,
+          instructions: _notes[index].text.trim(),
+          priority: task.priority,
+          basis: task.basis,
         ),
-        const SizedBox(height: 10),
-        _CareCard(
-          icon: AppIcons.careLight,
-          label: 'LIGHT',
-          value: lightLabel(species?.growth.light),
-          hint: species?.growth.light == null
-              ? 'The catalog has no light reading for this species.'
-              : null,
+      );
+    }
+    Navigator.of(context).pop(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit care'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var index = 0; index < widget.tasks.length; index++) ...[
+              TextField(
+                controller: _days[index],
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: '${widget.tasks[index].title} (days)',
+                ),
+              ),
+              TextField(
+                controller: _notes[index],
+                decoration: const InputDecoration(labelText: 'Instructions'),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_error != null)
+              Text(
+                _error!,
+                style: AppText.body.copyWith(color: AppColors.terracottaBright),
+              ),
+          ],
         ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(onPressed: _save, child: const Text('Save')),
       ],
     );
   }

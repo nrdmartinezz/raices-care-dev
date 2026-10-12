@@ -28,6 +28,7 @@ import {
   lookupGardenName,
   mergeBySlug,
   normalizeVernacular,
+  pinAliasSpecies,
 } from "./vernacular";
 
 /** Re-fetch a cached species once its data is this old. */
@@ -200,11 +201,10 @@ async function attemptTrefleSearch(
 /**
  * Searches the catalog and returns summaries only.
  *
- * A typed common name is resolved to a scientific name first, then Trefle
- * `GET /plants/search` runs with that name. The original text is searched
- * too when it is not already the scientific name. Learned names are cached
- * in `vernacularAliases`. The client shows candidates and then calls
- * `resolveSpecies` for the pick.
+ * The typed text is the search. A resolved scientific name only pins that
+ * one species at the top; the rest of the scientific-name page is dropped.
+ * Learned names are cached in `vernacularAliases`. The client shows
+ * candidates and then calls `resolveSpecies` for the pick.
  */
 export const searchSpeciesCatalog = onCall(
   {
@@ -266,7 +266,9 @@ export const searchSpeciesCatalog = onCall(
       }
 
       const matches = mergeBySlug(
-        aliasOutcome.ok ? aliasOutcome.matches : [],
+        scientific !== null && searchScientific && aliasOutcome.ok
+          ? pinAliasSpecies(aliasOutcome.matches, scientific)
+          : [],
         directOutcome.ok ? directOutcome.matches : [],
         searchScientific ? label : null,
       );

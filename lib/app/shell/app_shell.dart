@@ -339,6 +339,25 @@ class _BranchFadeState extends State<_BranchFade>
   }
 }
 
+/// Insets that clear the shell's floating header and nav.
+EdgeInsets shellScrollPadding(BuildContext context) {
+  final insets = MediaQuery.paddingOf(context);
+  if (AppLayout.isWide(context)) {
+    return EdgeInsets.fromLTRB(
+      AppLayout.contentPadding,
+      AppLayout.contentPadding,
+      AppLayout.contentPadding,
+      AppLayout.contentPadding + insets.bottom,
+    );
+  }
+  return EdgeInsets.only(
+    top: AppSizes.headerHeight + AppSizes.headerContentGap + insets.top,
+    bottom: AppSizes.navHeight + 32 + insets.bottom,
+    left: AppSizes.screenPadding,
+    right: AppSizes.screenPadding,
+  );
+}
+
 /// A scroll view inset to clear the shell's floating header and nav.
 class ShellScrollView extends StatelessWidget {
   const ShellScrollView({super.key, required this.child});
@@ -347,26 +366,28 @@ class ShellScrollView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final insets = MediaQuery.paddingOf(context);
-    final wide = AppLayout.isWide(context);
     return SingleChildScrollView(
-      padding: wide
-          ? EdgeInsets.fromLTRB(
-              AppLayout.contentPadding,
-              AppLayout.contentPadding,
-              AppLayout.contentPadding,
-              AppLayout.contentPadding + insets.bottom,
-            )
-          : EdgeInsets.only(
-              top:
-                  AppSizes.headerHeight +
-                  AppSizes.headerContentGap +
-                  insets.top,
-              bottom: AppSizes.navHeight + 32 + insets.bottom,
-              left: AppSizes.screenPadding,
-              right: AppSizes.screenPadding,
-            ),
+      padding: shellScrollPadding(context),
       child: child,
+    );
+  }
+}
+
+/// The same insets as [ShellScrollView], for a list that builds as it scrolls.
+class ShellSliverScroll extends StatelessWidget {
+  const ShellSliverScroll({super.key, required this.slivers});
+
+  final List<Widget> slivers;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: shellScrollPadding(context),
+          sliver: SliverMainAxisGroup(slivers: slivers),
+        ),
+      ],
     );
   }
 }

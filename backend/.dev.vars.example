@@ -4,3 +4,7 @@
 # FCM stays a dry run until this is set with `wrangler secret put` and
 # DRY_RUN_PUSH is changed to "false".
 # FCM_SERVICE_ACCOUNT_JSON=
+#
+# Flora care fallback. Register at https://floraapi.com/register
+# Set the real value in .dev.vars, and on the Worker with `wrangler secret put`.
+# FLORA_API_KEY=

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { careForName, readPlantCare, writePlantCare } from "../catalog/plant_care";
 import type { AppEnv } from "../env";
 import { parseBody, readObject } from "../http/body";
 import { decodeCursor, encodeCursor, pageLimit } from "../http/cursor";
@@ -11,6 +12,7 @@ export const plantRoutes = new Hono<AppEnv>();
 
 const locationTypes = ["indoor", "outdoor", "greenhouse", "other"] as const;
 const healthValues = ["healthy", "needs_attention", "recovering", "unknown"] as const;
+const ageStages = ["seed", "seedling", "young_establishing", "mature", "unknown"] as const;
 
 const createSchema = z
   .object({
@@ -23,6 +25,7 @@ const createSchema = z
     acquiredAt: z.union([z.string(), z.number()]).nullable().optional(),
     plantedAt: z.union([z.string(), z.number()]).nullable().optional(),
     health: z.enum(healthValues).nullable().optional(),
+    plantAgeStage: z.enum(ageStages).nullable().optional(),
     notes: z.string().max(4000).nullable().optional(),
   })
   .strict();
@@ -55,6 +58,8 @@ type PlantRow = {
   next_pest_check_at: number | null;
   health: string | null;
   notes: string | null;
+  care_tasks_json: string | null;
+  plant_age_stage: string | null;
   revision: number;
   created_at: number;
   updated_at: number;
@@ -62,6 +67,7 @@ type PlantRow = {
 };
 
 function plantJson(row: PlantRow) {
+  const care = readPlantCare(row.care_tasks_json);
   return {
     id: row.id,
     gardenId: row.garden_id,
@@ -80,9 +86,29 @@ function plantJson(row: PlantRow) {
     nextPestCheckAt: iso(row.next_pest_check_at),
     health: row.health,
     notes: row.notes,
+    plantAgeStage: row.plant_age_stage,
+    careTasks: care.tasks,
+    difficulty: care.difficulty,
+    light: care.light,
+    sourceUrl: care.sourceUrl,
+    sourceLabel: care.sourceLabel,
     revision: row.revision,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
+  };
+}
+
+function careResponse(
+  care: ReturnType<typeof readPlantCare>,
+  speciesId: string | null,
+) {
+  return {
+    careTasks: care.tasks,
+    difficulty: care.difficulty,
+    light: care.light,
+    sourceUrl: care.sourceUrl,
+    sourceLabel: care.sourceLabel,
+    speciesId,
   };
 }
 
@@ -92,7 +118,7 @@ const plantSelect = `
     p.last_watered_at, p.next_water_check_at,
     p.last_fertilized_at, p.next_fertilize_at,
     p.last_pest_check_at, p.next_pest_check_at,
-    p.health, p.notes, p.revision, p.created_at, p.updated_at,
+    p.health, p.notes, p.care_tasks_json, p.plant_age_stage, p.revision, p.created_at, p.updated_at,
     s.scientific_name
   FROM plants p
   LEFT JOIN species s ON s.id = p.species_id
@@ -141,8 +167,8 @@ plantRoutes.post("/v1/plants", async (c) => {
   await c.env.DB.prepare(
     `INSERT INTO plants (
       id, user_id, garden_id, species_id, nickname, location_type,
-      acquired_at, planted_at, health, notes, revision, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+      acquired_at, planted_at, health, notes, plant_age_stage, revision, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     ON CONFLICT(id) DO NOTHING`,
   )
     .bind(
@@ -156,6 +182,7 @@ plantRoutes.post("/v1/plants", async (c) => {
       optionalTime(body.plantedAt, "plantedAt"),
       body.health ?? null,
       body.notes ?? null,
+      body.plantAgeStage ?? null,
       ts,
       ts,
     )
@@ -179,11 +206,21 @@ plantRoutes.post("/v1/plants/:plantId/chores", async (c) => {
   const userId = c.get("userId");
   const plantId = clientId(c.req.param("plantId"), "plantId");
   const row = await loadPlant(c.env.DB, userId, plantId);
+  const saved = readPlantCare(row.care_tasks_json);
+  if (saved.tasks.length > 0) {
+    await seedPlantReminders(c.env.DB, {
+      userId,
+      plantId,
+      speciesId: row.species_id,
+      tasks: saved.tasks,
+    });
+    return c.json({ ok: true });
+  }
   if (!row.species_id) {
     throw new ApiError(
       412,
       "failed_precondition",
-      "This plant has no species to build a care rhythm from.",
+      "This plant has no care rhythm yet.",
     );
   }
   const profile = await c.env.DB.prepare(
@@ -204,6 +241,80 @@ plantRoutes.post("/v1/plants/:plantId/chores", async (c) => {
     speciesId: row.species_id,
   });
   return c.json({ ok: true });
+});
+
+const careTaskSchema = z.object({
+  taskType: z.enum(["water_check", "fertilize", "pest_check"]),
+  intervalDays: z.number().int().min(1).max(365),
+  instructions: z.string().max(500),
+});
+
+plantRoutes.post("/v1/plants/:plantId/care", async (c) => {
+  const userId = c.get("userId");
+  const plantId = clientId(c.req.param("plantId"), "plantId");
+  const row = await loadPlant(c.env.DB, userId, plantId);
+  const saved = readPlantCare(row.care_tasks_json);
+  if (saved.tasks.length > 0) {
+    return c.json(careResponse(saved, row.species_id));
+  }
+  const found = await careForName(row.nickname ?? "", {
+    floraApiKey: c.env.FLORA_API_KEY,
+  });
+  const ts = now();
+  await c.env.DB.prepare(
+    `UPDATE plants SET
+      care_tasks_json = ?,
+      revision = revision + 1,
+      updated_at = ?
+     WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
+  )
+    .bind(writePlantCare(found), ts, plantId, userId)
+    .run();
+  await seedPlantReminders(c.env.DB, {
+    userId,
+    plantId,
+    speciesId: row.species_id,
+    tasks: found.tasks,
+  });
+  return c.json(careResponse(found, row.species_id));
+});
+
+plantRoutes.patch("/v1/plants/:plantId/care", async (c) => {
+  const userId = c.get("userId");
+  const plantId = clientId(c.req.param("plantId"), "plantId");
+  const row = await loadPlant(c.env.DB, userId, plantId);
+  const body = parseBody(
+    z.object({ tasks: z.array(careTaskSchema).min(1).max(3) }).strict(),
+    await readObject(c),
+  );
+  const current = readPlantCare(row.care_tasks_json);
+  const tasks = current.tasks.map((task) => {
+    const edited = body.tasks.find((item) => item.taskType === task.taskType);
+    if (!edited) return task;
+    return {
+      ...task,
+      intervalDays: edited.intervalDays,
+      instructions: edited.instructions,
+    };
+  });
+  const ts = now();
+  await c.env.DB.prepare(
+    `UPDATE plants SET care_tasks_json = ?, revision = revision + 1, updated_at = ?
+     WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
+  )
+    .bind(writePlantCare({ ...current, tasks }), ts, plantId, userId)
+    .run();
+  for (const task of tasks) {
+    await c.env.DB.prepare(
+      `UPDATE reminders SET instructions = ?, interval_days = ?, updated_at = ?
+       WHERE user_id = ? AND plant_id = ? AND task_type = ? AND status = 'open' AND deleted_at IS NULL`,
+    )
+      .bind(task.instructions, task.intervalDays, ts, userId, plantId, task.taskType)
+      .run();
+  }
+  const updated = await loadPlant(c.env.DB, userId, plantId);
+  c.header("ETag", `"${updated.revision}"`);
+  return c.json(plantJson(updated));
 });
 
 plantRoutes.get("/v1/plants/:plantId", async (c) => {

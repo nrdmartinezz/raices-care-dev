@@ -38,7 +38,29 @@ export interface SlugMatch {
   common_name: string | null;
 }
 
-/** Alias-search hits come first. The first unnamed alias hit uses the typed name. */
+export interface RankedSlugMatch extends SlugMatch {
+  scientific_name: string;
+  rank?: string | null;
+}
+
+/**
+ * The species row for a resolved alias, or nothing.
+ * A scientific-name search page is not the result list.
+ */
+export function pinAliasSpecies<T extends RankedSlugMatch>(
+  matches: readonly T[],
+  scientificName: string,
+): T[] {
+  const target = normalizeVernacular(scientificName);
+  const exact = matches.find(
+    (match) =>
+      normalizeVernacular(match.scientific_name) === target &&
+      (match.rank == null || match.rank === "species"),
+  );
+  return exact ? [exact] : [];
+}
+
+/** Alias-search hits come first. The pinned species takes the typed name. */
 export function mergeBySlug<T extends SlugMatch>(
   aliasHits: readonly T[],
   directHits: readonly T[],
@@ -49,7 +71,7 @@ export function mergeBySlug<T extends SlugMatch>(
   const push = (match: T, fillName: boolean) => {
     if (seen.has(match.slug)) return;
     seen.add(match.slug);
-    if (fillName && !match.common_name && matchedName) {
+    if (fillName && matchedName) {
       merged.push({ ...match, common_name: matchedName });
       return;
     }

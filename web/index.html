@@ -54,20 +54,34 @@
   <link rel="manifest" href="manifest.json">
 
   <!--
-    The phone browser must not scroll the document. When the add-plant
-    search reaches its last result, leftover scroll was handed to the
-    page and the tab reloaded.
+    The phone browser must not scroll the document. Catalog photos are HTML
+    images, and leftover scroll on those images was reloading the tab.
   -->
   <style>
     html, body {
       margin: 0;
+      position: fixed;
+      inset: 0;
+      width: 100%;
       height: 100%;
       overflow: hidden;
       overscroll-behavior: none;
     }
 
     flt-glass-pane {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
       overscroll-behavior: none;
+    }
+
+    flt-platform-view,
+    flt-platform-view-slot,
+    flt-glass-pane img {
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+      pointer-events: none;
     }
   </style>
 </head>

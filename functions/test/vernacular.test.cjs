@@ -4,6 +4,7 @@ const {
   normalizeVernacular,
   lookupGardenName,
   mergeBySlug,
+  pinAliasSpecies,
 } = require("../lib/catalog/vernacular");
 
 test("normalize strips accents and punctuation", () => {
@@ -22,6 +23,68 @@ test("garden names resolve to one scientific name", () => {
   assert.equal(lookupGardenName("jitomate"), "Solanum lycopersicum");
   assert.equal(lookupGardenName("tomate"), "Solanum lycopersicum");
   assert.equal(lookupGardenName("no such plant"), null);
+});
+
+test("jalapeno pins Capsicum annuum and drops the rest of that page", () => {
+  const page = [
+    {
+      slug: "capsicum-annuum",
+      common_name: "pepper",
+      scientific_name: "Capsicum annuum",
+      rank: "species",
+    },
+    {
+      slug: "capsicum-annuum-glabriusculum",
+      common_name: "chiltepin",
+      scientific_name: "Capsicum annuum var. glabriusculum",
+      rank: "variety",
+    },
+    {
+      slug: "capsicum-chinense",
+      common_name: "habanero",
+      scientific_name: "Capsicum chinense",
+      rank: "species",
+    },
+  ];
+
+  const pinned = pinAliasSpecies(page, "Capsicum annuum");
+  assert.deepEqual(
+    pinned.map((match) => match.slug),
+    ["capsicum-annuum"],
+  );
+
+  const merged = mergeBySlug(
+    pinned,
+    [
+      {
+        slug: "capsicum-annuum",
+        common_name: "jalapeno",
+        scientific_name: "Capsicum annuum",
+        rank: "species",
+      },
+      {
+        slug: "capsicum-annuum-jalapeno",
+        common_name: "jalapeno",
+        scientific_name: "Capsicum annuum 'Jalapeno'",
+        rank: "variety",
+      },
+    ],
+    "jalapeno",
+  );
+  assert.deepEqual(
+    merged.map((match) => [match.slug, match.common_name]),
+    [
+      ["capsicum-annuum", "jalapeno"],
+      ["capsicum-annuum-jalapeno", "jalapeno"],
+    ],
+  );
+
+  const bellPepper = mergeBySlug(pinned, [], "bell pepper");
+  assert.deepEqual(
+    bellPepper.map((match) => [match.slug, match.common_name]),
+    [["capsicum-annuum", "bell pepper"]],
+  );
+  assert.equal(pinAliasSpecies(page.slice(1), "Capsicum annuum").length, 0);
 });
 
 test("alias hits stay ahead of the direct search and keep a typed name", () => {

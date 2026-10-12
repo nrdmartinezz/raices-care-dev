@@ -30,7 +30,7 @@ class _AddPlantScreenState extends ConsumerState<AddPlantScreen> {
   late var _step = widget.preset == null ? 1 : 2;
   var _canPop = true;
 
-  /// Step 2 goes back to the search rather than off the screen.
+  /// Step 2 goes back to the name rather than off the screen.
   void _back() {
     if (_flow.currentState?.goBack() ?? false) {
       return;
@@ -91,7 +91,7 @@ class _AddPlantScreenState extends ConsumerState<AddPlantScreen> {
               right: 0,
               child: FlowHeader(
                 eyebrow: preset ? 'ADD TO GARDEN' : 'STEP $_step OF 3',
-                title: _step == 1 ? 'Choose a plant' : 'Plant setup',
+                title: _step == 1 ? 'Name your plant' : 'Plant setup',
                 onBack: _back,
               ),
             ),
@@ -101,8 +101,7 @@ class _AddPlantScreenState extends ConsumerState<AddPlantScreen> {
     );
   }
 
-  /// The third step is the plant itself: its profile, with the care rhythm the
-  /// create trigger just seeded.
+  /// The third step is the plant itself. Care is looked up after it exists.
   Future<void> _openPlant(String plantId) async {
     if (!mounted) {
       return;

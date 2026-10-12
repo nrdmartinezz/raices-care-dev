@@ -57,6 +57,15 @@ class CareProfileTask {
     priority: ReminderPriority.fromWire(map['priority']),
     basis: FirestoreValue.strings(map['basis']),
   );
+
+  Map<String, Object?> toMap() => {
+    'taskType': taskType.wire,
+    'title': title,
+    'intervalDays': intervalDays,
+    'instructions': instructions,
+    'priority': priority.wire,
+    'basis': basis,
+  };
 }
 
 /// A care schedule at /species/{speciesId}/careProfiles/{profileId}.

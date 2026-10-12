@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/utils/firestore_values.dart';
+import 'care_profile.dart';
 
 enum LocationType {
   indoor('indoor'),
@@ -266,6 +267,11 @@ class Plant {
     this.currentCare = const PlantCurrentCare(),
     this.nextActions = const PlantNextActions(),
     this.coverPhotoPath,
+    this.careTasks = const [],
+    this.careDifficulty,
+    this.careLight,
+    this.careSourceUrl,
+    this.careSourceLabel,
     this.catalogStatus = CatalogStatus.unknown,
     this.createdAt,
     this.updatedAt,
@@ -295,6 +301,13 @@ class Plant {
 
   /// Storage path, not a download URL, so links can be re-signed on demand.
   final String? coverPhotoPath;
+  final List<CareProfileTask> careTasks;
+
+  /// PlantSolve tips saved with this plant. Empty when care used the defaults.
+  final String? careDifficulty;
+  final String? careLight;
+  final String? careSourceUrl;
+  final String? careSourceLabel;
   final CatalogStatus catalogStatus;
   final DateTime? createdAt;
   final DateTime? updatedAt;

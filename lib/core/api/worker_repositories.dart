@@ -49,6 +49,13 @@ class WorkerPlantRepository extends PlantRepository {
 
   @override
   Future<void> deletePlant(String plantId) => backend.deletePlant(plantId);
+
+  @override
+  Future<void> loadCare(String plantId) => backend.loadCare(plantId);
+
+  @override
+  Future<void> updateCare(String plantId, List<CareProfileTask> tasks) =>
+      backend.updateCare(plantId, tasks);
 }
 
 class WorkerCareEventRepository extends CareEventRepository {

@@ -7,6 +7,7 @@ import '../../../core/api/api_providers.dart';
 import '../../../core/api/worker_repositories.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/firebase/firebase_providers.dart';
+import '../domain/care_profile.dart';
 import '../domain/plant.dart';
 
 /// Drops archived plants and sorts by display name.
@@ -75,8 +76,7 @@ class PlantRepository {
   /// Creates a plant and returns its id.
   ///
   /// The id is generated here rather than by Firestore so the caller can
-  /// reference the plant immediately. Chores are not created with the plant;
-  /// the plant page adds them once a care profile exists.
+  /// reference the plant immediately. Care is filled in after the plant exists.
   Future<String> createPlant(Plant plant) {
     return guardFirebase(() async {
       final id = plant.id.isEmpty ? _uuid.v4() : plant.id;
@@ -84,6 +84,12 @@ class PlantRepository {
       return id;
     });
   }
+
+  /// Looks up care for the plant's name and stores it on the plant.
+  Future<void> loadCare(String plantId) async {}
+
+  /// Replaces this plant's saved care intervals and instructions.
+  Future<void> updateCare(String plantId, List<CareProfileTask> tasks) async {}
 
   Future<void> updatePlant(Plant plant) {
     return guardFirebase(

@@ -91,6 +91,7 @@ class WorkerBackend {
       'nickname': plant.displayName,
       'locationType': plant.locationType.wire,
       'health': plant.status.health.wire,
+      'plantAgeStage': plant.plantAgeStage.wire,
       if (plant.speciesId.isNotEmpty) 'speciesId': plant.speciesId,
       if (plant.careProfileId != null) 'careProfileId': plant.careProfileId,
       if (plant.acquiredAt != null)
@@ -119,7 +120,67 @@ class WorkerBackend {
       idempotencyKey: id,
     );
     await _flushQuietly();
+    // Care is filled in after the plant exists. Saving does not wait on it.
+    unawaited(_attachCare(id));
     return id;
+  }
+
+  Future<void> _attachCare(String plantId) async {
+    try {
+      await loadCare(plantId);
+    } on Object {
+      // The plant page asks again while it is open.
+    }
+  }
+
+  Future<void> loadCare(String plantId) async {
+    final json = await _client.sendJson('POST', '/v1/plants/$plantId/care');
+    await _mergePlant(plantId, {
+      'careTasks': json['careTasks'],
+      'difficulty': json['difficulty'],
+      'light': json['light'],
+      'sourceUrl': json['sourceUrl'],
+      'sourceLabel': json['sourceLabel'],
+      if (json['speciesId'] != null) 'speciesId': json['speciesId'],
+    });
+    await _pullReminders();
+  }
+
+  Future<void> updateCare(String plantId, List<CareProfileTask> tasks) async {
+    final json = await _client.sendJson(
+      'PATCH',
+      '/v1/plants/$plantId/care',
+      body: {
+        'tasks': [
+          for (final task in tasks)
+            {
+              'taskType': task.taskType.wire,
+              'intervalDays': task.intervalDays,
+              'instructions': task.instructions ?? '',
+            },
+        ],
+      },
+    );
+    await _mergePlant(plantId, {
+      'careTasks': json['careTasks'],
+      'difficulty': json['difficulty'],
+      'light': json['light'],
+      'sourceUrl': json['sourceUrl'],
+      'sourceLabel': json['sourceLabel'],
+    });
+  }
+
+  Future<void> _mergePlant(String plantId, Map<String, Object?> extra) async {
+    final cached = await _database.readDocument('plants', plantId);
+    if (cached == null) return;
+    final payload = _json(cached.payload);
+    payload.addAll(extra);
+    await _database.saveDocument(
+      collection: 'plants',
+      id: plantId,
+      parentId: cached.parentId,
+      payload: jsonEncode(payload),
+    );
   }
 
   Future<void> updatePlant(Plant plant) async {
@@ -751,6 +812,7 @@ class WorkerBackend {
           'Plant',
       gardenId: _spot(json['gardenId'] as String?),
       locationType: LocationType.fromWire(json['locationType']),
+      plantAgeStage: PlantAgeStage.fromWire(json['plantAgeStage']),
       speciesNameSnapshot: json['speciesName'] as String?,
       acquiredAt: _time(json['acquiredAt']),
       plantedAt: _time(json['plantedAt']),
@@ -768,9 +830,39 @@ class WorkerBackend {
         nextFertilizeAt: _time(json['nextFertilizeAt']),
         nextPestCheckAt: _time(json['nextPestCheckAt']),
       ),
+      careTasks: _careTasks(json['careTasks']),
+      careDifficulty: _careText(json['difficulty']),
+      careLight: _careText(json['light']),
+      careSourceUrl: _careText(json['sourceUrl']),
+      careSourceLabel:
+          _careText(json['sourceLabel']) ?? _sourceLabel(_careText(json['sourceUrl'])),
       createdAt: _time(json['createdAt']),
       updatedAt: _time(json['updatedAt']),
     );
+  }
+
+  List<CareProfileTask> _careTasks(Object? raw) {
+    if (raw is! List) return const [];
+    return [
+      for (final item in raw)
+        if (item is Map)
+          CareProfileTask.fromMap(Map<String, dynamic>.from(item)),
+    ];
+  }
+
+  String? _careText(Object? raw) {
+    if (raw is! String) return null;
+    final trimmed = raw.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  String? _sourceLabel(String? url) {
+    if (url == null) return null;
+    if (url.contains('plantsolve.com')) return 'PlantSolve';
+    if (url.contains('plants.usda.gov') || url.contains('floraapi.com')) {
+      return 'Flora';
+    }
+    return null;
   }
 
   CareEvent _careEvent(String plantId, String payload) {

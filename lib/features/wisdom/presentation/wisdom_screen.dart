@@ -170,96 +170,112 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
       });
     });
 
-    return ShellScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (AppLayout.isWide(context))
-            const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _WisdomIntro()),
-                SizedBox(width: 16),
-                DesktopHeaderActions(),
-              ],
-            )
-          else
-            const _WisdomIntro(),
-          const SizedBox(height: AppSizes.sectionGap),
-          ref
-              .watch(gardenFrostProvider)
-              .when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (error, _) =>
-                    const FrostCalendarCard(frost: GardenFrostUnavailable()),
-                data: (frost) => FrostCalendarCard(frost: frost),
-              ),
-          const SizedBox(height: AppSizes.sectionGap),
-          Row(
+    final attribution = _attribution;
+    return ShellSliverScroll(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: _SearchField(
-                  controller: _query,
-                  enabled: !_busy,
-                  onSubmitted: _search,
-                ),
-              ),
-              const SizedBox(width: 16),
-              SearchFilterButton(
-                count: _filters.count,
-                onPressed: _busy ? null : () => setState(() => _filtering = true),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _SearchButton(isLoading: _busy, onPressed: _busy ? null : _search),
-          if (recents.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _RecentRow(
-              terms: recents,
-              onTap: _busy ? null : _search,
-            ),
-          ],
-          if (_error case final message?) ...[
-            const SizedBox(height: 12),
-            Text(
-              message,
-              style: AppText.body.copyWith(color: AppColors.terracottaBright),
-            ),
-          ],
-          if (_searched) ...[
-            const SizedBox(height: AppSizes.sectionGap),
-            Text(
-              _results.isEmpty
-                  ? 'No matches for "${_term ?? ''}"'
-                  : 'Plants matching "${_term ?? ''}"',
-              style: AppText.title.copyWith(color: AppColors.ink),
-            ),
-            const SizedBox(height: 12),
-            if (_results.isEmpty)
-              Text(
-                'Try the everyday name, like tomato or basil.',
-                style: AppText.bodyLarge.copyWith(color: AppColors.body),
-              ),
-            for (final candidate in _results) ...[
-              _ResultCard(
-                candidate: candidate,
-                inSeason: _seasons[candidate.scientificName.toLowerCase()],
-                onTap: () => _open(candidate),
+              if (AppLayout.isWide(context))
+                const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _WisdomIntro()),
+                    SizedBox(width: 16),
+                    DesktopHeaderActions(),
+                  ],
+                )
+              else
+                const _WisdomIntro(),
+              const SizedBox(height: AppSizes.sectionGap),
+              ref
+                  .watch(gardenFrostProvider)
+                  .when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (error, _) => const FrostCalendarCard(
+                      frost: GardenFrostUnavailable(),
+                    ),
+                    data: (frost) => FrostCalendarCard(frost: frost),
+                  ),
+              const SizedBox(height: AppSizes.sectionGap),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SearchField(
+                      controller: _query,
+                      enabled: !_busy,
+                      onSubmitted: _search,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  SearchFilterButton(
+                    count: _filters.count,
+                    onPressed: _busy
+                        ? null
+                        : () => setState(() => _filtering = true),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
+              _SearchButton(isLoading: _busy, onPressed: _busy ? null : _search),
+              if (recents.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _RecentRow(terms: recents, onTap: _busy ? null : _search),
+              ],
+              if (_error case final message?) ...[
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  style: AppText.body.copyWith(
+                    color: AppColors.terracottaBright,
+                  ),
+                ),
+              ],
+              if (_searched) ...[
+                const SizedBox(height: AppSizes.sectionGap),
+                Text(
+                  _results.isEmpty
+                      ? 'No matches for "${_term ?? ''}"'
+                      : 'Plants matching "${_term ?? ''}"',
+                  style: AppText.title.copyWith(color: AppColors.ink),
+                ),
+                const SizedBox(height: 12),
+                if (_results.isEmpty)
+                  Text(
+                    'Try the everyday name, like tomato or basil.',
+                    style: AppText.bodyLarge.copyWith(color: AppColors.body),
+                  ),
+              ],
             ],
-          ],
-          if (_attribution case final attribution? when attribution.isNotEmpty)
-            Text(
+          ),
+        ),
+        if (_searched && _results.isNotEmpty)
+          SliverList.builder(
+            itemCount: _results.length,
+            itemBuilder: (context, index) {
+              final candidate = _results[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _ResultCard(
+                  candidate: candidate,
+                  inSeason: _seasons[candidate.scientificName.toLowerCase()],
+                  onTap: () => _open(candidate),
+                ),
+              );
+            },
+          ),
+        if (attribution != null && attribution.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Text(
               attribution,
               style: AppText.caption.copyWith(color: AppColors.muted),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }

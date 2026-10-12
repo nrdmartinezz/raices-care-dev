@@ -5,6 +5,7 @@ import {
   lookupGardenName,
   mergeBySlug,
   normalizeVernacular,
+  pinAliasSpecies,
 } from "./vernacular";
 import {
   TREFLE_ATTRIBUTION,
@@ -234,7 +235,9 @@ export async function liveCatalogHits(
     return { hits: [], attribution: null, scientificName: scientific };
   }
   const merged = mergeBySlug(
-    aliasHits ?? [],
+    scientific !== null && searchScientific
+      ? pinAliasSpecies(aliasHits ?? [], scientific)
+      : [],
     directHits ?? [],
     searchScientific ? label : null,
   );

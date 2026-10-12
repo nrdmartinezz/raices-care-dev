@@ -8,9 +8,9 @@ import 'package:raices/features/care/data/reminder_repository.dart';
 import 'package:raices/features/care/domain/care_task_type.dart';
 import 'package:raices/features/care/domain/reminder.dart';
 import 'package:raices/features/home/data/home_providers.dart';
+import 'package:raices/features/planting/data/planting_repository.dart';
 import 'package:raices/features/plants/data/observation_repository.dart';
 import 'package:raices/features/plants/data/plant_repository.dart';
-import 'package:raices/features/plants/data/recent_searches.dart';
 import 'package:raices/features/plants/data/species_repository.dart';
 import 'package:raices/features/plants/domain/care_profile.dart';
 import 'package:raices/features/plants/domain/garden_spot.dart';
@@ -114,6 +114,7 @@ ProviderContainer _container({List<Reminder>? reminders}) => ProviderContainer(
         .overrideWith((ref) => Stream.value(reminders ?? _reminders)),
     plantObservationsProvider('p1')
         .overrideWith((ref) => Stream.value(const [])),
+    sowingForSpeciesProvider('sp1').overrideWith((ref) => Future.value(null)),
   ],
 );
 
@@ -139,58 +140,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('STEP 1 OF 3'), findsOneWidget);
-    expect(find.text('Choose a plant'), findsOneWidget);
-    expect(find.text('Find your next green companion'), findsOneWidget);
+    expect(find.text('Name your plant'), findsWidgets);
+    expect(find.text('Name'), findsOneWidget);
+    expect(find.text('Add a picture'), findsOneWidget);
     expect(find.text('Recent & suggested'), findsNothing);
     expect(find.text('Monstera'), findsNothing);
-
-    final searches = container.read(recentSearchesProvider.notifier);
-    for (final term in [
-      'Aloe',
-      'Basil',
-      'Fern',
-      'Ivy',
-      'Kale',
-      'Mint',
-      'Olive',
-      'Pea',
-    ]) {
-      searches.remember(term);
-    }
-    await tester.pump();
-
-    expect(find.text('Aloe'), findsNothing);
-    expect(find.text('Pea'), findsOneWidget);
-    expect(find.text('Basil', skipOffstage: false), findsOneWidget);
-
-    await tester.tap(find.bySemanticsLabel('Filters'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('STEP 1 OF 3'), findsOneWidget);
-    expect(find.text('Apply filters'), findsOneWidget);
-    expect(find.text('Species'), findsOneWidget);
-
-    await tester.tap(find.text('Species'));
-    await tester.pump();
-    expect(find.text('1 selected'), findsOneWidget);
-    expect(find.text('1 filter selected'), findsOneWidget);
-
-    await tester.tap(find.bySemanticsLabel('Back'));
-    await tester.pumpAndSettle();
-    expect(find.text('Find your next green companion'), findsOneWidget);
-    expect(find.text('Apply filters'), findsNothing);
-    expect(find.text('1'), findsNothing);
-
-    await tester.tap(find.bySemanticsLabel('Filters'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Species'));
-    await tester.pump();
-    await tester.tap(find.text('Apply filters'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Find your next green companion'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
-    expect(find.bySemanticsLabel('Filters, 1 selected'), findsOneWidget);
+    expect(find.bySemanticsLabel('Filters'), findsNothing);
   });
 
   testWidgets('the plant profile replaces the shell header and keeps the nav', (
@@ -227,10 +182,10 @@ void main() {
     expect(find.text('Seedling'), findsOneWidget);
     expect(find.text('Thriving'), findsOneWidget);
 
-    // The soonest reminder leads; the rest fall under upcoming care.
-    expect(find.text('Due today'), findsOneWidget);
-    expect(find.text('Feed the soil', skipOffstage: false), findsOneWidget);
-    expect(find.text('In 10 days', skipOffstage: false), findsOneWidget);
+    // Watering is due, so the status card leads; later chores sit under next care.
+    expect(find.text('Due for check'), findsOneWidget);
+    expect(find.text('Feed the soil', skipOffstage: false), findsWidgets);
+    expect(find.text('In 10 days', skipOffstage: false), findsWidgets);
 
     // Watering comes from the care profile, light from the catalog record.
     expect(find.text('Every 5 days', skipOffstage: false), findsOneWidget);

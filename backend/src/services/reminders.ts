@@ -52,23 +52,26 @@ export async function seedPlantReminders(
     plantId: string;
     speciesId: string | null;
     careProfileId?: string | null;
+    tasks?: CareTask[];
   },
 ): Promise<void> {
-  if (!input.speciesId) return;
-  const profile = input.careProfileId
-    ? await db
-        .prepare("SELECT tasks_json FROM care_profiles WHERE id = ? AND species_id = ?")
-        .bind(input.careProfileId, input.speciesId)
-        .first<{ tasks_json: string }>()
-    : await db
-        .prepare(
-          "SELECT tasks_json FROM care_profiles WHERE species_id = ? ORDER BY id LIMIT 1",
-        )
-        .bind(input.speciesId)
-        .first<{ tasks_json: string }>();
-  if (!profile) return;
-
-  const tasks = readJson<CareTask[]>(profile.tasks_json, []);
+  let tasks = input.tasks;
+  if (!tasks) {
+    if (!input.speciesId) return;
+    const profile = input.careProfileId
+      ? await db
+          .prepare("SELECT tasks_json FROM care_profiles WHERE id = ? AND species_id = ?")
+          .bind(input.careProfileId, input.speciesId)
+          .first<{ tasks_json: string }>()
+      : await db
+          .prepare(
+            "SELECT tasks_json FROM care_profiles WHERE species_id = ? ORDER BY id LIMIT 1",
+          )
+          .bind(input.speciesId)
+          .first<{ tasks_json: string }>();
+    if (!profile) return;
+    tasks = readJson<CareTask[]>(profile.tasks_json, []);
+  }
   const created = now();
   const statements: D1PreparedStatement[] = [];
   for (const task of tasks) {

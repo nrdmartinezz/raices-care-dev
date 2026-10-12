@@ -9,6 +9,8 @@ export interface Env {
   FCM_SERVICE_ACCOUNT_JSON?: string;
   /** Set in `.dev.vars` locally, or with `wrangler secret put` when deployed. */
   TREFLE_API_TOKEN?: string;
+  /** Flora care fallback. Same storage as the Trefle token. */
+  FLORA_API_KEY?: string;
 }
 
 export type AppVariables = {
