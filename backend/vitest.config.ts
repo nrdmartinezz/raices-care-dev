@@ -15,6 +15,8 @@ export default defineConfig(async () => {
         miniflare: {
           bindings: {
             TEST_MIGRATIONS: migrations,
+            // Deploy config is production. The suite signs in with the dev token.
+            ENVIRONMENT: "development",
           },
         },
       }),

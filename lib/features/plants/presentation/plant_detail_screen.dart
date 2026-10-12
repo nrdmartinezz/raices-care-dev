@@ -30,6 +30,7 @@ import '../domain/plant.dart';
 import '../domain/species.dart';
 import 'add_plant_flow.dart';
 import 'care_labels.dart';
+import 'edit_care_guide_screen.dart';
 
 /// One plant: what it is, where it lives, what it needs next, and the notes
 /// kept about it.
@@ -126,6 +127,24 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
           const SizedBox(height: AppSizes.sectionGap),
         ],
         _Hero(plant: plant, species: species),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: () => context.pushNamed(
+              PlantEditRoute.name,
+              pathParameters: {'plantId': plant.id},
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.terracotta,
+              padding: EdgeInsets.zero,
+            ),
+            child: Text(
+              'Edit plant details',
+              style: AppText.label.copyWith(color: AppColors.terracotta),
+            ),
+          ),
+        ),
         const SizedBox(height: AppSizes.sectionGap),
         _PlantOverview(
           plant: plant,
@@ -157,8 +176,10 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
         ],
         const SizedBox(height: AppSizes.sectionGap),
         _CareGuide(
+          plant: plant,
           species: species,
           tasks: plant.careTasks,
+          profiles: profiles,
           waterTask: waterTask,
           loading: _loadingCare && plant.careTasks.isEmpty,
           calendar: calendar,
@@ -166,7 +187,11 @@ class _PlantDetailScreenState extends ConsumerState<PlantDetailScreen> {
           light: plant.careLight,
           sourceUrl: plant.careSourceUrl,
           sourceLabel: plant.careSourceLabel,
-          onEdit: plant.careTasks.isEmpty ? null : () => _editCare(plant),
+          onEditTasks: plant.careTasks.isEmpty ? null : () => _editCare(plant),
+          onEditGuide: () => context.pushNamed(
+            PlantCareGuideRoute.name,
+            pathParameters: {'plantId': plant.id},
+          ),
         ),
         const SizedBox(height: AppSizes.sectionGap),
         _Upcoming(reminders: reminders, now: now),
@@ -501,7 +526,10 @@ class _Hero extends ConsumerWidget {
         ? null
         : ref.watch(plantCoverImageProvider(path));
     final catalogUrl = species?.imageUrl;
-    final scientific = species?.scientificName;
+    final scientific =
+        plant.scientificName ??
+        species?.scientificName ??
+        plant.speciesNameSnapshot;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -601,7 +629,11 @@ class _Stats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final garden = GardenSpot.fromWire(plant.gardenId);
-    final born = plant.acquiredAt ?? plant.plantedAt ?? plant.createdAt;
+    final born =
+        plant.ageFrom ??
+        plant.plantedAt ??
+        plant.acquiredAt ??
+        plant.createdAt;
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1102,8 +1134,10 @@ class _HarvestCountdown extends StatelessWidget {
 
 class _CareGuide extends StatelessWidget {
   const _CareGuide({
+    required this.plant,
     required this.species,
     required this.tasks,
+    required this.profiles,
     required this.waterTask,
     required this.loading,
     required this.calendar,
@@ -1111,11 +1145,14 @@ class _CareGuide extends StatelessWidget {
     required this.light,
     required this.sourceUrl,
     required this.sourceLabel,
-    required this.onEdit,
+    required this.onEditTasks,
+    required this.onEditGuide,
   });
 
+  final Plant plant;
   final Species? species;
   final List<CareProfileTask> tasks;
+  final List<CareProfile>? profiles;
   final CareProfileTask? waterTask;
   final bool loading;
   final SowingCalendar? calendar;
@@ -1123,7 +1160,8 @@ class _CareGuide extends StatelessWidget {
   final String? light;
   final String? sourceUrl;
   final String? sourceLabel;
-  final VoidCallback? onEdit;
+  final VoidCallback? onEditTasks;
+  final VoidCallback onEditGuide;
 
   @override
   Widget build(BuildContext context) {
@@ -1132,6 +1170,10 @@ class _CareGuide extends StatelessWidget {
         : [if (waterTask != null) waterTask!];
     final plantLight = light?.trim();
     final level = difficulty?.trim();
+    final saved = plant.careGuide;
+    final suggested = suggestCareGuide(species, profiles);
+    String show(String? own, String? catalog, String empty) =>
+        own ?? catalog ?? empty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1144,8 +1186,29 @@ class _CareGuide extends StatelessWidget {
                 title: 'Care guide',
               ),
             ),
-            if (onEdit != null)
-              TextButton(onPressed: onEdit, child: const Text('Edit')),
+            if (onEditTasks != null)
+              TextButton(
+                onPressed: onEditTasks,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.terracotta,
+                  padding: EdgeInsets.zero,
+                ),
+                child: Text(
+                  'Edit',
+                  style: AppText.label.copyWith(color: AppColors.terracotta),
+                ),
+              ),
+            TextButton(
+              onPressed: onEditGuide,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.terracotta,
+                padding: EdgeInsets.zero,
+              ),
+              child: Text(
+                'Edit guide',
+                style: AppText.label.copyWith(color: AppColors.terracotta),
+              ),
+            ),
           ],
         ),
         if (calendar != null && calendar!.hasWindows) ...[
@@ -1223,6 +1286,48 @@ class _CareGuide extends StatelessWidget {
             ),
           ],
         ],
+        const SizedBox(height: 10),
+        if ((plantLight == null || plantLight.isEmpty) && species == null)
+          _CareCard(
+            icon: AppIcons.careLight,
+            label: 'LIGHT',
+            value: show(saved?.light, suggested.light, 'Not known'),
+          ),
+        if ((plantLight == null || plantLight.isEmpty) && species == null)
+          const SizedBox(height: 10),
+        _CareCard(
+          icon: AppIcons.taskPest,
+          label: 'PESTS',
+          value: show(saved?.pests, suggested.pests, 'Nothing noted yet'),
+        ),
+        const SizedBox(height: 10),
+        _CareCard(
+          icon: AppIcons.taskFertilize,
+          label: 'FEEDING',
+          value: show(saved?.feeding, suggested.feeding, 'Nothing noted yet'),
+        ),
+        const SizedBox(height: 10),
+        _CareCard(
+          icon: AppIcons.careWatering,
+          label: 'PRUNING',
+          value: show(saved?.pruning, suggested.pruning, 'Nothing noted yet'),
+        ),
+        const SizedBox(height: 10),
+        _CareCard(
+          icon: AppIcons.careLight,
+          label: 'HUMIDITY',
+          value: show(saved?.humidity, suggested.humidity, 'Not known'),
+        ),
+        const SizedBox(height: 10),
+        _CareCard(
+          icon: AppIcons.careWatering,
+          label: 'REPOTTING',
+          value: show(
+            saved?.repotting,
+            suggested.repotting,
+            'Nothing noted yet',
+          ),
+        ),
       ],
     );
   }

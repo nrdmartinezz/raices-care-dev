@@ -131,6 +131,13 @@ class PhotoRepository {
   }
 }
 
+final plantPhotosProvider = StreamProvider.family<List<PlantPhoto>, String>((
+  ref,
+  plantId,
+) {
+  return ref.watch(photoRepositoryProvider).watchPhotos(plantId);
+});
+
 final photoRepositoryProvider = Provider<PhotoRepository>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   final firestore = ref.watch(firestoreProvider);

@@ -68,6 +68,53 @@ enum SunExposure {
   );
 }
 
+/// The six topics a gardener can rewrite for one plant.
+class PlantCareGuide {
+  const PlantCareGuide({
+    this.light,
+    this.pests,
+    this.feeding,
+    this.pruning,
+    this.humidity,
+    this.repotting,
+  });
+
+  final String? light;
+  final String? pests;
+  final String? feeding;
+  final String? pruning;
+  final String? humidity;
+  final String? repotting;
+
+  static PlantCareGuide? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    String? text(String key) {
+      final value = raw[key];
+      if (value is! String) return null;
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    return PlantCareGuide(
+      light: text('light'),
+      pests: text('pests'),
+      feeding: text('feeding'),
+      pruning: text('pruning'),
+      humidity: text('humidity'),
+      repotting: text('repotting'),
+    );
+  }
+
+  Map<String, String?> toJson() => {
+    'light': light,
+    'pests': pests,
+    'feeding': feeding,
+    'pruning': pruning,
+    'humidity': humidity,
+    'repotting': repotting,
+  };
+}
+
 enum PlantHealth {
   healthy('healthy'),
   needsAttention('needs_attention'),
@@ -260,6 +307,10 @@ class Plant {
     this.careProfileId,
     this.acquiredAt,
     this.plantedAt,
+    this.ageFrom,
+    this.scientificName,
+    this.coverPhotoId,
+    this.careGuide,
     this.plantAgeStage = PlantAgeStage.unknown,
     this.container = const PlantContainer(),
     this.environment = const PlantEnvironment(),
@@ -292,6 +343,21 @@ class Plant {
   final String? careProfileId;
   final DateTime? acquiredAt;
   final DateTime? plantedAt;
+
+  /// Set only after the gardener edits the age. Until then the age shown is
+  /// calculated from [plantedAt], then [acquiredAt], then [createdAt].
+  final DateTime? ageFrom;
+
+  /// The gardener's name for the species. The catalog name is
+  /// [speciesNameSnapshot] and is left alone.
+  final String? scientificName;
+
+  /// D1 photo id used as the profile photo. The image lives in R2.
+  final String? coverPhotoId;
+
+  /// The gardener's care guide. Null means the profile still shows the catalog.
+  final PlantCareGuide? careGuide;
+
   final PlantAgeStage plantAgeStage;
   final PlantContainer container;
   final PlantEnvironment environment;

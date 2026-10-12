@@ -11,6 +11,7 @@ import { rateLimitMiddleware } from "./middleware/rateLimit";
 import { careRoutes } from "./routes/care";
 import { gardenRoutes } from "./routes/gardens";
 import { healthRoutes } from "./routes/health";
+import { journalRoutes } from "./routes/journal";
 import { meRoutes } from "./routes/me";
 import { photoRoutes } from "./routes/photos";
 import { plantRoutes } from "./routes/plants";
@@ -33,6 +34,7 @@ export function createApp(options?: { jwks?: JWTVerifyGetKey }) {
   app.route("/", plantingRoutes);
   app.route("/", gardenRoutes);
   app.route("/", plantRoutes);
+  app.route("/", journalRoutes);
   app.route("/", careRoutes);
   app.route("/", reminderRoutes);
   app.route("/", photoRoutes);

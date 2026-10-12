@@ -10,6 +10,7 @@ import '../../features/care/domain/reminder.dart';
 import '../../features/photos/domain/plant_photo.dart';
 import '../../features/plants/data/species_repository.dart';
 import '../../features/plants/domain/care_profile.dart';
+import '../../features/plants/domain/observation.dart';
 import '../../features/plants/domain/plant.dart';
 import '../../features/plants/domain/search_filters.dart';
 import '../../features/plants/domain/species.dart';
@@ -183,23 +184,63 @@ class WorkerBackend {
     );
   }
 
-  Future<void> updatePlant(Plant plant) async {
-    final cached = await _database.readDocument('plants', plant.id);
-    final revision = cached == null ? null : _json(cached.payload)['revision'];
-    final body = <String, Object?>{
+  Future<void> updatePlant(Plant plant) {
+    return patchPlant(plant.id, {
       'nickname': plant.displayName,
       'locationType': plant.locationType.wire,
       'health': plant.status.health.wire,
+      'growingMethod': plant.growingMethod.wire,
       if (plant.gardenId != null) 'gardenId': _gardenId(plant.gardenId!),
-    };
-    await _queue(
-      id: 'plant-update-${plant.id}',
-      method: 'PATCH',
-      path: '/v1/plants/${plant.id}',
-      body: body,
-      ifMatch: revision?.toString(),
-    );
-    await _flushQuietly();
+      'scientificName': plant.scientificName,
+      'plantedAt': plant.plantedAt?.toUtc().toIso8601String(),
+      if (plant.ageFrom != null)
+        'ageFrom': plant.ageFrom!.toUtc().toIso8601String(),
+      'coverPhotoId': plant.coverPhotoId,
+      if (plant.careGuide != null) 'careGuide': plant.careGuide!.toJson(),
+    });
+  }
+
+  /// Writes a partial plant update to D1. Keys absent from [changes] stay as
+  /// they are, including [ageFrom] when the gardener has not edited the age.
+  Future<void> patchPlant(String plantId, Map<String, Object?> changes) async {
+    final cached = await _database.readDocument('plants', plantId);
+    final json = cached == null ? <String, dynamic>{} : _json(cached.payload);
+    final revision = json['revision'];
+    json.addAll(changes);
+    if (cached != null) {
+      await _database.saveDocument(
+        collection: 'plants',
+        id: plantId,
+        parentId: cached.parentId,
+        payload: jsonEncode(json),
+      );
+    }
+    try {
+      // Watering and a cover-photo delete advance the plant revision on their
+      // own, so the save reads the current one instead of the cached copy.
+      final latest = await _client.getJson('/v1/plants/$plantId');
+      final current = latest['revision'] ?? revision;
+      final saved = await _client.sendJson(
+        'PATCH',
+        '/v1/plants/$plantId',
+        body: changes,
+        ifMatch: current?.toString(),
+      );
+      await _database.saveDocument(
+        collection: 'plants',
+        id: plantId,
+        parentId: cached?.parentId ?? _spot(saved['gardenId'] as String?),
+        payload: jsonEncode(saved),
+      );
+    } on NetworkException {
+      await _queue(
+        id: 'plant-update-$plantId',
+        method: 'PATCH',
+        path: '/v1/plants/$plantId',
+        body: changes,
+        ifMatch: revision?.toString(),
+      );
+    }
   }
 
   Future<void> archivePlant(String plantId) async {
@@ -342,6 +383,148 @@ class WorkerBackend {
         for (final event in events)
           if (event.eventType == eventType) event,
       ],
+    );
+  }
+
+  Future<void> updateEvent({
+    required String plantId,
+    required CareEvent event,
+  }) async {
+    final cached = await _database.readDocument('care_events', event.id);
+    final json = cached == null
+        ? <String, dynamic>{'id': event.id}
+        : _json(cached.payload);
+    json['occurredAt'] = event.occurredAt.toUtc().toIso8601String();
+    json['note'] = event.note;
+    await _database.saveDocument(
+      collection: 'care_events',
+      id: event.id,
+      parentId: plantId,
+      payload: jsonEncode(json),
+    );
+    await _queue(
+      id: 'care-update-${event.id}',
+      method: 'PATCH',
+      path: '/v1/plants/$plantId/care-events/${event.id}',
+      body: {
+        'occurredAt': event.occurredAt.toUtc().toIso8601String(),
+        'note': event.note,
+      },
+    );
+    await _flushQuietly();
+  }
+
+  Stream<List<Observation>> watchJournal(String plantId) {
+    unawaited(_pullJournal(plantId));
+    return _database.watchCollection('journal', parentId: plantId).map(
+      (rows) => rows.map((row) => _journal(row.payload)).toList(),
+    );
+  }
+
+  Future<void> addJournalNote({
+    required String plantId,
+    required String note,
+    DateTime? observedAt,
+  }) async {
+    final id = _uuid.v4();
+    final when = observedAt ?? DateTime.now();
+    final body = {
+      'id': id,
+      'note': note,
+      'observedAt': when.toUtc().toIso8601String(),
+    };
+    await _database.saveDocument(
+      collection: 'journal',
+      id: id,
+      parentId: plantId,
+      payload: jsonEncode({...body, 'plantId': plantId}),
+    );
+    await _queue(
+      id: 'journal-$id',
+      method: 'POST',
+      path: '/v1/plants/$plantId/journal',
+      body: body,
+      idempotencyKey: id,
+    );
+    await _flushQuietly();
+  }
+
+  Future<void> updateJournalNote({
+    required String plantId,
+    required String entryId,
+    required String note,
+    DateTime? observedAt,
+  }) async {
+    final cached = await _database.readDocument('journal', entryId);
+    final json = cached == null
+        ? <String, dynamic>{'id': entryId, 'plantId': plantId}
+        : _json(cached.payload);
+    json['note'] = note;
+    if (observedAt != null) {
+      json['observedAt'] = observedAt.toUtc().toIso8601String();
+    }
+    await _database.saveDocument(
+      collection: 'journal',
+      id: entryId,
+      parentId: plantId,
+      payload: jsonEncode(json),
+    );
+    await _queue(
+      id: 'journal-update-$entryId',
+      method: 'PATCH',
+      path: '/v1/plants/$plantId/journal/$entryId',
+      body: {
+        'note': note,
+        if (observedAt != null)
+          'observedAt': observedAt.toUtc().toIso8601String(),
+      },
+    );
+    await _flushQuietly();
+  }
+
+  Future<void> deleteJournalNote({
+    required String plantId,
+    required String entryId,
+  }) async {
+    await _database.removeDocument('journal', entryId);
+    await _queue(
+      id: 'journal-delete-$entryId',
+      method: 'DELETE',
+      path: '/v1/plants/$plantId/journal/$entryId',
+      body: const {},
+    );
+    await _flushQuietly();
+  }
+
+  Future<void> _pullJournal(String plantId) async {
+    try {
+      final json = await _client.getJson('/v1/plants/$plantId/journal');
+      final results = json['results'];
+      if (results is! List) return;
+      for (final item in results) {
+        if (item is! Map) continue;
+        final row = item.cast<String, dynamic>();
+        final id = row['id'];
+        if (id is! String) continue;
+        await _database.saveDocument(
+          collection: 'journal',
+          id: id,
+          parentId: plantId,
+          payload: jsonEncode(row),
+        );
+      }
+    } on NetworkException {
+      return;
+    }
+  }
+
+  Observation _journal(String payload) {
+    final json = _json(payload);
+    return Observation(
+      id: json['id'] as String? ?? '',
+      note: json['note'] as String? ?? '',
+      observedAt: _time(json['observedAt']) ?? DateTime.now(),
+      createdAt: _time(json['createdAt']),
     );
   }
 
@@ -504,6 +687,7 @@ class WorkerBackend {
   }) async {
     await _database.removeDocument('photos', photo.id);
     await _client.sendJson('DELETE', '/v1/photos/${photo.id}');
+    await _pullPlants();
   }
 
   Future<String> uploadAvatar({
@@ -814,8 +998,16 @@ class WorkerBackend {
       locationType: LocationType.fromWire(json['locationType']),
       plantAgeStage: PlantAgeStage.fromWire(json['plantAgeStage']),
       speciesNameSnapshot: json['speciesName'] as String?,
+      scientificName: json['scientificName'] as String?,
+      growingMethod: GrowingMethod.fromWire(json['growingMethod']),
       acquiredAt: _time(json['acquiredAt']),
       plantedAt: _time(json['plantedAt']),
+      ageFrom: _time(json['ageFrom']),
+      coverPhotoId: json['coverPhotoId'] as String?,
+      coverPhotoPath: json['coverPhotoId'] is String
+          ? '$workerPhotoPrefix${json['coverPhotoId']}'
+          : null,
+      careGuide: PlantCareGuide.fromJson(json['careGuide']),
       status: PlantStatus(
         health: PlantHealth.fromWire(json['health']),
         isArchived: archivedAt != null,

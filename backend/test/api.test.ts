@@ -615,7 +615,184 @@ describe("species search", () => {
       "ocimum-basilicum",
     );
   });
+});
 
+describe("plant edits", () => {
+  it("updates the plant without touching the species or the planted date", async () => {
+    const ts = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO species (id, scientific_name, common_names_json, plant_groups_json, toxicity_json, created_at, updated_at)
+       VALUES ('monstera-edit', 'Monstera deliciosa', '["monstera"]', '["foliage"]', '{}', ?, ?)`,
+    )
+      .bind(ts, ts)
+      .run();
+    await call(
+      "/v1/gardens",
+      dev("editor", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "garden-edit", name: "Indoors" }),
+      }),
+    );
+    const created = await call(
+      "/v1/plants",
+      dev("editor", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: "plant-edit",
+          gardenId: "garden-edit",
+          speciesId: "monstera-edit",
+          nickname: "Monstera",
+          plantedAt: "2020-01-15T00:00:00.000Z",
+        }),
+      }),
+    );
+    expect(created.status).toBe(201);
+
+    const uploaded = await call(
+      "/v1/plants/plant-edit/photos",
+      dev("editor", {
+        method: "POST",
+        headers: { "content-type": "image/jpeg" },
+        body: jpeg,
+      }),
+    );
+    expect(uploaded.status).toBe(201);
+    const photo = (await uploaded.json()) as { id: string };
+
+    const planted = "2022-03-04T00:00:00.000Z";
+    const age = "2024-06-01T00:00:00.000Z";
+    const patched = await call(
+      "/v1/plants/plant-edit",
+      dev("editor", {
+        method: "PATCH",
+        headers: { "content-type": "application/json", "if-match": "1" },
+        body: JSON.stringify({
+          nickname: "Kitchen monstera",
+          scientificName: "Monstera deliciosa var. borsigiana",
+          plantedAt: planted,
+          ageFrom: age,
+          growingMethod: "raised_bed",
+          health: "healthy",
+          coverPhotoId: photo.id,
+          careGuide: {
+            light: "Bright indirect",
+            pests: "Spider mites",
+            feeding: "Monthly in summer",
+            pruning: "Spring",
+            humidity: "High",
+            repotting: "Every two years",
+          },
+        }),
+      }),
+    );
+    expect(patched.status).toBe(200);
+    const body = (await patched.json()) as {
+      nickname: string;
+      scientificName: string;
+      speciesName: string;
+      plantedAt: string;
+      ageFrom: string;
+      growingMethod: string;
+      coverPhotoId: string;
+      careGuide: { light: string };
+      revision: number;
+    };
+    expect(body.nickname).toBe("Kitchen monstera");
+    expect(body.scientificName).toBe("Monstera deliciosa var. borsigiana");
+    expect(body.speciesName).toBe("Monstera deliciosa");
+    expect(body.plantedAt).toBe(planted);
+    expect(body.ageFrom).toBe(age);
+    expect(body.growingMethod).toBe("raised_bed");
+    expect(body.coverPhotoId).toBe(photo.id);
+    expect(body.careGuide.light).toBe("Bright indirect");
+
+    const laterAge = "2019-01-01T00:00:00.000Z";
+    const aged = await call(
+      "/v1/plants/plant-edit",
+      dev("editor", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "if-match": String(body.revision),
+        },
+        body: JSON.stringify({ ageFrom: laterAge }),
+      }),
+    );
+    expect(aged.status).toBe(200);
+    const afterAge = (await aged.json()) as { plantedAt: string; ageFrom: string };
+    expect(afterAge.ageFrom).toBe(laterAge);
+    expect(afterAge.plantedAt).toBe(planted);
+
+    const species = await env.DB.prepare(
+      "SELECT scientific_name, updated_at FROM species WHERE id = 'monstera-edit'",
+    ).first<{ scientific_name: string; updated_at: number }>();
+    expect(species?.scientific_name).toBe("Monstera deliciosa");
+    expect(species?.updated_at).toBe(ts);
+  });
+
+  it("adds, updates, and deletes journal notes for the plant", async () => {
+    await call(
+      "/v1/gardens",
+      dev("journaler", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "garden-journal", name: "Desk" }),
+      }),
+    );
+    await call(
+      "/v1/plants",
+      dev("journaler", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "plant-journal", gardenId: "garden-journal" }),
+      }),
+    );
+
+    const created = await call(
+      "/v1/plants/plant-journal/journal",
+      dev("journaler", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "note-1", note: "New leaf unfurling" }),
+      }),
+    );
+    expect(created.status).toBe(201);
+
+    const listed = await call("/v1/plants/plant-journal/journal", dev("journaler"));
+    const list = (await listed.json()) as { results: { id: string; note: string }[] };
+    expect(list.results.map((entry) => entry.note)).toEqual(["New leaf unfurling"]);
+
+    const updated = await call(
+      "/v1/plants/plant-journal/journal/note-1",
+      dev("journaler", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ note: "Two new leaves" }),
+      }),
+    );
+    expect(updated.status).toBe(200);
+    expect((await updated.json()) as { note: string }).toMatchObject({ note: "Two new leaves" });
+
+    const again = await call("/v1/plants/plant-journal/journal", dev("journaler"));
+    const after = (await again.json()) as { results: { note: string }[] };
+    expect(after.results.map((entry) => entry.note)).toEqual(["Two new leaves"]);
+
+    expect(
+      (
+        await call(
+          "/v1/plants/plant-journal/journal/note-1",
+          dev("journaler", { method: "DELETE" }),
+        )
+      ).status,
+    ).toBe(204);
+    const empty = await call("/v1/plants/plant-journal/journal", dev("journaler"));
+    expect((await empty.json()) as { results: unknown[] }).toMatchObject({ results: [] });
+  });
+});
+
+describe("species search", () => {
   it("refuses to fetch an unknown species without a catalog token", async () => {
     const response = await call(
       "/v1/species/resolve",

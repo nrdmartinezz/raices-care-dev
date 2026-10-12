@@ -118,6 +118,71 @@ careRoutes.post("/v1/plants/:plantId/care-events", async (c) => {
   );
 });
 
+const patchSchema = z
+  .object({
+    occurredAt: z.union([z.string(), z.number()]).optional(),
+    note: z.string().max(4000).nullable().optional(),
+  })
+  .strict();
+
+careRoutes.patch("/v1/plants/:plantId/care-events/:eventId", async (c) => {
+  const userId = c.get("userId");
+  const plantId = c.req.param("plantId");
+  await loadPlant(c.env.DB, userId, plantId);
+  const body = parseBody(patchSchema, await readObject(c));
+  if (body.occurredAt === undefined && body.note === undefined) {
+    throw new ApiError(400, "validation_error", "Nothing to update.");
+  }
+  const eventId = c.req.param("eventId");
+  const existing = await c.env.DB.prepare(
+    `SELECT id, event_type, occurred_at, note, details_json, created_at
+     FROM care_events
+     WHERE id = ? AND plant_id = ? AND user_id = ? AND deleted_at IS NULL`,
+  )
+    .bind(eventId, plantId, userId)
+    .first<{
+      id: string;
+      event_type: string;
+      occurred_at: number;
+      note: string | null;
+      details_json: string;
+      created_at: number;
+    }>();
+  if (!existing) throw new ApiError(404, "not_found", "Care event not found.");
+  const occurredAt =
+    body.occurredAt === undefined ? existing.occurred_at : parseTime(body.occurredAt, "occurredAt");
+  const note = body.note === undefined ? existing.note : body.note;
+  await c.env.DB.prepare(
+    `UPDATE care_events SET occurred_at = ?, note = ?
+     WHERE id = ? AND plant_id = ? AND user_id = ? AND deleted_at IS NULL`,
+  )
+    .bind(occurredAt, note, eventId, plantId, userId)
+    .run();
+  if (existing.event_type === "watered") {
+    const latest = await c.env.DB.prepare(
+      `SELECT MAX(occurred_at) AS occurred_at FROM care_events
+       WHERE plant_id = ? AND user_id = ? AND event_type = 'watered' AND deleted_at IS NULL`,
+    )
+      .bind(plantId, userId)
+      .first<{ occurred_at: number | null }>();
+    await c.env.DB.prepare(
+      `UPDATE plants SET last_watered_at = ?, updated_at = ?, revision = revision + 1
+       WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
+    )
+      .bind(latest?.occurred_at ?? null, now(), plantId, userId)
+      .run();
+  }
+  return c.json({
+    id: existing.id,
+    plantId,
+    eventType: existing.event_type,
+    occurredAt: iso(occurredAt),
+    note,
+    details: readJson(existing.details_json, {}),
+    createdAt: iso(existing.created_at),
+  });
+});
+
 careRoutes.delete("/v1/plants/:plantId/care-events/:eventId", async (c) => {
   const userId = c.get("userId");
   const plantId = c.req.param("plantId");

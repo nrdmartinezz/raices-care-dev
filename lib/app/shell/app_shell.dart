@@ -275,6 +275,23 @@ class AppShell extends ConsumerWidget {
             : context.goNamed(MyPlantsRoute.name),
       );
     }
+    if (routeName == PlantEditRoute.name ||
+        routeName == PlantCareGuideRoute.name) {
+      return FlowHeader(
+        eyebrow: 'MY PLANTS',
+        title: routeName == PlantEditRoute.name
+            ? 'Edit plant'
+            : 'Care guide',
+        onBack: () => context.pop(),
+        action: TextButton(
+          onPressed: () => context.pop(),
+          child: Text(
+            'Cancel',
+            style: AppText.label.copyWith(color: AppColors.terracotta),
+          ),
+        ),
+      );
+    }
     if (routeName == SpeciesArticleRoute.name) {
       return FlowHeader(
         eyebrow: 'WISDOM',

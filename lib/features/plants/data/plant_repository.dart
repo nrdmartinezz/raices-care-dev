@@ -99,6 +99,14 @@ class PlantRepository {
     );
   }
 
+  /// Partial update stored by the Worker. The Firestore path does not keep
+  /// these edits; the Worker repository overrides this.
+  Future<void> patchPlant(String plantId, Map<String, Object?> changes) {
+    throw const UnexpectedException(
+      'Plant details are saved with the garden API.',
+    );
+  }
+
   /// Archives rather than deletes, so the care history stays intact.
   Future<void> archivePlant(String plantId) {
     return guardFirebase(

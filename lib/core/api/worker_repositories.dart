@@ -45,6 +45,10 @@ class WorkerPlantRepository extends PlantRepository {
   Future<void> updatePlant(Plant plant) => backend.updatePlant(plant);
 
   @override
+  Future<void> patchPlant(String plantId, Map<String, Object?> changes) =>
+      backend.patchPlant(plantId, changes);
+
+  @override
   Future<void> archivePlant(String plantId) => backend.archivePlant(plantId);
 
   @override
@@ -81,6 +85,12 @@ class WorkerCareEventRepository extends CareEventRepository {
     CareEventType eventType, {
     int limit = 50,
   }) => backend.watchHistoryOfType(plantId, eventType, limit: limit);
+
+  @override
+  Future<void> updateEvent({
+    required String plantId,
+    required CareEvent event,
+  }) => backend.updateEvent(plantId: plantId, event: event);
 
   @override
   Future<void> deleteEvent({
