@@ -91,6 +91,7 @@ class WorkerBackend {
       'gardenId': gardenId,
       'nickname': plant.displayName,
       'locationType': plant.locationType.wire,
+      'growingMethod': plant.growingMethod.wire,
       'health': plant.status.health.wire,
       'plantAgeStage': plant.plantAgeStage.wire,
       if (plant.speciesId.isNotEmpty) 'speciesId': plant.speciesId,
@@ -698,11 +699,19 @@ class WorkerBackend {
     return workerAvatarPath;
   }
 
-  Future<void> syncProfile({String? displayName, String? email}) {
+  Future<void> syncProfile({
+    String? displayName,
+    String? email,
+    String? hardinessZone,
+  }) {
     return _client.sendJson(
       'PUT',
       '/v1/me',
-      body: {'displayName': ?displayName, 'email': ?email},
+      body: {
+        'displayName': ?displayName,
+        'email': ?email,
+        'hardinessZone': ?hardinessZone,
+      },
     );
   }
 

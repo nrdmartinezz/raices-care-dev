@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { assignCarePlan } from "../catalog/care_plan";
+import { LIGHT_LEVELS } from "../catalog/care_rules";
 import { careForName, readPlantCare, writePlantCare } from "../catalog/plant_care";
 import type { AppEnv } from "../env";
 import { parseBody, readObject } from "../http/body";
@@ -14,6 +16,13 @@ const locationTypes = ["indoor", "outdoor", "greenhouse", "other"] as const;
 const healthValues = ["healthy", "needs_attention", "recovering", "unknown"] as const;
 const ageStages = ["seed", "seedling", "young_establishing", "mature", "unknown"] as const;
 const growingMethods = ["container", "in_ground", "raised_bed", "hydroponic", "other"] as const;
+
+const zoneSchema = z
+  .string()
+  .trim()
+  .regex(/^(?:1[0-3]|[1-9])[ab]$/i)
+  .nullable()
+  .optional();
 
 const careGuideSchema = z
   .object({
@@ -39,6 +48,9 @@ const createSchema = z
     health: z.enum(healthValues).nullable().optional(),
     plantAgeStage: z.enum(ageStages).nullable().optional(),
     notes: z.string().max(4000).nullable().optional(),
+    growingMethod: z.enum(growingMethods).nullable().optional(),
+    sunlight: z.enum(LIGHT_LEVELS).nullable().optional(),
+    hardinessZone: zoneSchema,
   })
   .strict();
 
@@ -86,6 +98,7 @@ type PlantRow = {
   age_from: number | null;
   cover_photo_id: string | null;
   care_guide_json: string | null;
+  care_profile_id: string | null;
   catalog_scientific_name: string | null;
 };
 
@@ -100,6 +113,7 @@ function plantJson(row: PlantRow) {
     nickname: row.nickname,
     locationType: row.location_type,
     growingMethod: row.growing_method,
+    careProfileId: row.care_profile_id,
     ageFrom: iso(row.age_from),
     coverPhotoId: row.cover_photo_id,
     careGuide: careGuideFrom(row.care_guide_json),
@@ -148,7 +162,7 @@ const plantSelect = `
     p.last_pest_check_at, p.next_pest_check_at,
     p.health, p.notes, p.care_tasks_json, p.plant_age_stage, p.revision, p.created_at, p.updated_at,
     p.scientific_name AS plant_scientific_name,
-    p.growing_method, p.age_from, p.cover_photo_id, p.care_guide_json,
+    p.growing_method, p.age_from, p.cover_photo_id, p.care_guide_json, p.care_profile_id,
     s.scientific_name AS catalog_scientific_name
   FROM plants p
   LEFT JOIN species s ON s.id = p.species_id
@@ -194,11 +208,13 @@ plantRoutes.post("/v1/plants", async (c) => {
   const id = optionalClientId(body.id, "id");
   const ts = now();
   const speciesId = body.speciesId ?? null;
-  await c.env.DB.prepare(
+  const plantedAt = optionalTime(body.plantedAt, "plantedAt");
+  const inserted = await c.env.DB.prepare(
     `INSERT INTO plants (
       id, user_id, garden_id, species_id, nickname, location_type,
-      acquired_at, planted_at, health, notes, plant_age_stage, revision, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+      acquired_at, planted_at, health, notes, plant_age_stage, growing_method,
+      revision, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     ON CONFLICT(id) DO NOTHING`,
   )
     .bind(
@@ -209,10 +225,11 @@ plantRoutes.post("/v1/plants", async (c) => {
       body.nickname ?? null,
       body.locationType ?? null,
       optionalTime(body.acquiredAt, "acquiredAt"),
-      optionalTime(body.plantedAt, "plantedAt"),
+      plantedAt,
       body.health ?? null,
       body.notes ?? null,
       body.plantAgeStage ?? null,
+      body.growingMethod ?? null,
       ts,
       ts,
     )
@@ -225,6 +242,30 @@ plantRoutes.post("/v1/plants", async (c) => {
     .first<{ id: string; user_id: string }>();
   if (!created || created.user_id !== userId) {
     throw new ApiError(409, "conflict", "That id is already in use.");
+  }
+
+  if ((inserted.meta.changes ?? 0) > 0) {
+    const assigned = await assignCarePlan(c.env.DB, {
+      userId,
+      plantId: id,
+      speciesId,
+      locationType: body.locationType ?? null,
+      growingMethod: body.growingMethod ?? null,
+      sunlight: body.sunlight ?? null,
+      hardinessZone: body.hardinessZone ?? null,
+      plantedAt,
+      plantAgeStage: body.plantAgeStage ?? null,
+      at: ts,
+    });
+    if (assigned.tasks.length > 0) {
+      await seedPlantReminders(c.env.DB, {
+        userId,
+        plantId: id,
+        speciesId,
+        careProfileId: assigned.profileId,
+        tasks: assigned.tasks,
+      });
+    }
   }
 
   const row = await loadPlant(c.env.DB, userId, id);

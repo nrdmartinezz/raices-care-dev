@@ -23,7 +23,11 @@ class AuthRepository {
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
-  final Future<void> Function({String? displayName, String? email})?
+  final Future<void> Function({
+    String? displayName,
+    String? email,
+    String? hardinessZone,
+  })?
   _syncAccount;
 
   /// Worker rows, while the ID token can still authorize the request.
@@ -201,24 +205,36 @@ class AuthRepository {
 
   Future<void> updateProfile(AppUser user) {
     return guardFirebase(() async {
-      await _mirrorAccount(displayName: user.displayName, email: user.email);
+      await _mirrorAccount(
+        displayName: user.displayName,
+        email: user.email,
+        hardinessZone: user.homeLocation.hardinessZone,
+      );
       await _profileRef(user.id)
           .set(user.toUpdateJson(), SetOptions(merge: true));
     });
   }
 
-  /// Sends name and email to the worker, then lets the caller write Firestore.
+  /// Sends name, email, and hardiness zone to the worker, then lets the
+  /// caller write Firestore.
   ///
-  /// Experience, the zone, and the rest of the profile live on the document
-  /// the app reads. A dropped worker call, common on mobile Chrome, must not
-  /// block that write or onboarding stays on this step forever.
-  Future<void> _mirrorAccount({String? displayName, String? email}) async {
+  /// A dropped worker call, common on mobile Chrome, must not block that
+  /// write or onboarding stays on this step forever.
+  Future<void> _mirrorAccount({
+    String? displayName,
+    String? email,
+    String? hardinessZone,
+  }) async {
     final sync = _syncAccount;
     if (sync == null) {
       return;
     }
     try {
-      await sync(displayName: displayName, email: email);
+      await sync(
+        displayName: displayName,
+        email: email,
+        hardinessZone: hardinessZone,
+      );
     } on NetworkException {
       return;
     }
@@ -392,9 +408,13 @@ final authRepositoryProvider = Provider<AuthRepository>(
     auth: ref.watch(firebaseAuthProvider),
     firestore: ref.watch(firestoreProvider),
     syncAccount: usesWorkerApi
-        ? ({displayName, email}) => ref
+        ? ({displayName, email, hardinessZone}) => ref
               .read(workerBackendProvider)
-              .syncProfile(displayName: displayName, email: email)
+              .syncProfile(
+                displayName: displayName,
+                email: email,
+                hardinessZone: hardinessZone,
+              )
         : null,
     deleteRemoteAccount: usesWorkerApi
         ? () => ref.read(workerBackendProvider).deleteAccount()

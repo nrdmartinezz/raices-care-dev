@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { normalizeZone } from "../catalog/care_rules";
 import type { AppEnv } from "../env";
 import { parseBody, readObject } from "../http/body";
 import { ApiError } from "../http/errors";
@@ -14,6 +15,12 @@ const profileSchema = z
     displayName: z.string().max(120).nullable().optional(),
     locale: z.string().max(35).nullable().optional(),
     timezone: z.string().max(80).nullable().optional(),
+    hardinessZone: z
+      .string()
+      .trim()
+      .regex(/^(?:1[0-3]|[1-9])[ab]$/i)
+      .nullable()
+      .optional(),
     recordOpen: z.boolean().optional(),
   })
   .strict();
@@ -39,6 +46,7 @@ function userJson(row: {
   display_name: string | null;
   locale: string | null;
   timezone: string | null;
+  hardiness_zone: string | null;
   avatar_object_key: string | null;
   created_at: number;
   updated_at: number;
@@ -49,6 +57,7 @@ function userJson(row: {
     displayName: row.display_name,
     locale: row.locale,
     timezone: row.timezone,
+    hardinessZone: row.hardiness_zone,
     hasAvatar: !!row.avatar_object_key,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
@@ -59,7 +68,7 @@ meRoutes.get("/v1/me", async (c) => {
   const userId = c.get("userId");
   await ensureUser(c.env.DB, userId);
   const row = await c.env.DB.prepare(
-    `SELECT id, email, display_name, locale, timezone, avatar_object_key, created_at, updated_at
+    `SELECT id, email, display_name, locale, timezone, hardiness_zone, avatar_object_key, created_at, updated_at
      FROM users WHERE id = ? AND deleted_at IS NULL`,
   )
     .bind(userId)
@@ -79,6 +88,7 @@ meRoutes.put("/v1/me", async (c) => {
       display_name = COALESCE(?, display_name),
       locale = COALESCE(?, locale),
       timezone = COALESCE(?, timezone),
+      hardiness_zone = COALESCE(?, hardiness_zone),
       last_opened_at = CASE WHEN ? = 1 THEN ? ELSE last_opened_at END,
       updated_at = ?
      WHERE id = ? AND deleted_at IS NULL`,
@@ -88,6 +98,7 @@ meRoutes.put("/v1/me", async (c) => {
       body.displayName === undefined ? null : body.displayName,
       body.locale === undefined ? null : body.locale,
       body.timezone === undefined ? null : body.timezone,
+      body.hardinessZone === undefined ? null : normalizeZone(body.hardinessZone),
       body.recordOpen === true ? 1 : 0,
       ts,
       ts,
@@ -95,7 +106,7 @@ meRoutes.put("/v1/me", async (c) => {
     )
     .run();
   const row = await c.env.DB.prepare(
-    `SELECT id, email, display_name, locale, timezone, avatar_object_key, created_at, updated_at
+    `SELECT id, email, display_name, locale, timezone, hardiness_zone, avatar_object_key, created_at, updated_at
      FROM users WHERE id = ? AND deleted_at IS NULL`,
   )
     .bind(userId)

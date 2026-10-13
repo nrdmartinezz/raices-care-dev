@@ -7,6 +7,7 @@
     "test": "vitest run",
     "db:migrate": "wrangler d1 migrations apply raices-care-sql --local",
     "db:seed": "wrangler d1 execute raices-care-sql --local --file=seed/sample_species.sql && wrangler d1 execute raices-care-sql --local --file=seed/planting_schedules.sql && wrangler d1 execute raices-care-sql --local --file=seed/frost_stations.sql",
+    "care:import": "node --experimental-strip-types scripts/import-care.ts --apply",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

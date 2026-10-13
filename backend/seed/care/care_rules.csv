@@ -1,0 +1,4 @@
+id,care_profile_id,task_type,rule_json,display_order,status
+crassula-ovata-indoor-water,crassula-ovata-indoor,water_check,"{""strategy"":""condition_based"",""primaryTrigger"":""soil_dry"",""checkEveryDays"":14,""requireDryThroughPot"":true,""instructions"":""Water thoroughly only when the potting mix has dried fully.""}",0,published
+crassula-ovata-indoor-feed,crassula-ovata-indoor,fertilize,"{""enabled"":true,""activeGrowthOnly"":true,""checkEveryDays"":30,""season"":""active_growth"",""instructions"":""Feed lightly during active growth.""}",1,published
+crassula-ovata-outdoor-water,crassula-ovata-outdoor,water_check,"{""strategy"":""condition_based"",""primaryTrigger"":""top_soil_dry"",""checkEveryDays"":7,""zoneMin"":""9a"",""zoneMax"":""11b"",""instructions"":""Check moisture more often outdoors, and water only when the top of the mix is dry.""}",0,published
