@@ -60,6 +60,12 @@ service cloud.firestore {
       return value is string && value.size() > 0 && value.size() <= maxLength;
     }
 
+    // A typed plant name is enough. Catalog species is optional, and the
+    // client sends '' when the gardener did not pick one.
+    function isOptionalString(value, maxLength) {
+      return value is string && value.size() <= maxLength;
+    }
+
     // --------------------------------------------------------- shared catalog
 
     match /species/{speciesId} {
@@ -134,7 +140,7 @@ service cloud.firestore {
       match /plants/{plantId} {
         function validPlant() {
           let data = request.resource.data;
-          return isFilledString(data.speciesId, 1500)
+          return isOptionalString(data.speciesId, 1500)
               && isFilledString(data.displayName, 120)
               && data.locationType in ['indoor', 'outdoor', 'greenhouse', 'other']
               && data.growingMethod in ['container', 'in_ground', 'raised_bed', 'hydroponic', 'other']

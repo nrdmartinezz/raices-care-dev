@@ -124,7 +124,8 @@ class _EditPlantScreenState extends ConsumerState<EditPlantScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final plant = ref.watch(plantProvider(widget.plantId)).value;
+    final plantAsync = ref.watch(plantProvider(widget.plantId));
+    final plant = plantAsync.value;
     if (plant != null && !_ready) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _ready) return;
@@ -132,13 +133,32 @@ class _EditPlantScreenState extends ConsumerState<EditPlantScreen> {
       });
     }
 
-    return ShellScrollView(
-      child: plant == null || !_ready
-          ? const Padding(
-              padding: EdgeInsets.only(top: 40),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          : _form(plant),
+    return ShellScrollView(child: _editor(plantAsync, plant));
+  }
+
+  Widget _editor(AsyncValue<Plant?> plantAsync, Plant? plant) {
+    if (plant == null && plantAsync.hasError) {
+      final error = plantAsync.error;
+      return _loadMessage(
+        error is AppException ? error.message : 'This plant could not load.',
+      );
+    }
+    if (plant == null && plantAsync.hasValue) {
+      return _loadMessage('That plant could not be loaded.');
+    }
+    if (plant == null || !_ready) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 40),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return _form(plant);
+  }
+
+  Widget _loadMessage(String message) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 40),
+      child: Text(message, style: AppText.body.copyWith(color: AppColors.body)),
     );
   }
 
@@ -318,7 +338,10 @@ class _Photos extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Plant photos', style: AppText.title.copyWith(color: AppColors.ink)),
+        Text(
+          'Plant photos',
+          style: AppText.title.copyWith(color: AppColors.ink),
+        ),
         const SizedBox(height: 8),
         SizedBox(
           height: 120,
@@ -332,10 +355,9 @@ class _Photos extends ConsumerWidget {
                   onCover: () => onCover(photo.id),
                   onDelete: () async {
                     try {
-                      await ref.read(photoRepositoryProvider).deletePhoto(
-                        plantId: plantId,
-                        photo: photo,
-                      );
+                      await ref
+                          .read(photoRepositoryProvider)
+                          .deletePhoto(plantId: plantId, photo: photo);
                       if (photo.id == coverId) onCover(null);
                     } on AppException catch (error) {
                       onError(error.message);
@@ -481,7 +503,10 @@ class _Notes extends ConsumerWidget {
         for (final note in notes)
           ListTile(
             contentPadding: EdgeInsets.zero,
-            title: Text(note.note, style: AppText.body.copyWith(color: AppColors.ink)),
+            title: Text(
+              note.note,
+              style: AppText.body.copyWith(color: AppColors.ink),
+            ),
             subtitle: Text(
               writtenLabel(note.observedAt, now: DateTime.now()),
               style: AppText.caption.copyWith(color: AppColors.muted),
@@ -497,19 +522,20 @@ class _Notes extends ConsumerWidget {
                       initial: note.note,
                     );
                     if (text == null) return;
-                    await ref.read(observationRepositoryProvider).update(
-                      plantId: plantId,
-                      observationId: note.id,
-                      note: text,
-                    );
+                    await ref
+                        .read(observationRepositoryProvider)
+                        .update(
+                          plantId: plantId,
+                          observationId: note.id,
+                          note: text,
+                        );
                   },
                   icon: const Icon(Icons.edit_outlined, size: 18),
                 ),
                 IconButton(
-                  onPressed: () => ref.read(observationRepositoryProvider).delete(
-                    plantId: plantId,
-                    observationId: note.id,
-                  ),
+                  onPressed: () => ref
+                      .read(observationRepositoryProvider)
+                      .delete(plantId: plantId, observationId: note.id),
                   icon: const Icon(Icons.delete_outline, size: 18),
                 ),
               ],
@@ -539,14 +565,16 @@ class _WateringLog extends ConsumerWidget {
             lastDate: DateTime.now().add(const Duration(days: 1)),
           );
           if (when == null) return;
-          await ref.read(careEventRepositoryProvider).logEvent(
-            plantId: plantId,
-            event: CareEvent(
-              id: const Uuid().v4(),
-              eventType: CareEventType.watered,
-              occurredAt: when,
-            ),
-          );
+          await ref
+              .read(careEventRepositoryProvider)
+              .logEvent(
+                plantId: plantId,
+                event: CareEvent(
+                  id: const Uuid().v4(),
+                  eventType: CareEventType.watered,
+                  occurredAt: when,
+                ),
+              );
         },
         child: const Text('Add'),
       ),
@@ -578,24 +606,25 @@ class _WateringLog extends ConsumerWidget {
                       lastDate: DateTime.now().add(const Duration(days: 1)),
                     );
                     if (when == null) return;
-                    await ref.read(careEventRepositoryProvider).updateEvent(
-                      plantId: plantId,
-                      event: CareEvent(
-                        id: event.id,
-                        eventType: event.eventType,
-                        occurredAt: when,
-                        note: event.note,
-                        details: event.details,
-                      ),
-                    );
+                    await ref
+                        .read(careEventRepositoryProvider)
+                        .updateEvent(
+                          plantId: plantId,
+                          event: CareEvent(
+                            id: event.id,
+                            eventType: event.eventType,
+                            occurredAt: when,
+                            note: event.note,
+                            details: event.details,
+                          ),
+                        );
                   },
                   icon: const Icon(Icons.edit_outlined, size: 18),
                 ),
                 IconButton(
-                  onPressed: () => ref.read(careEventRepositoryProvider).deleteEvent(
-                    plantId: plantId,
-                    eventId: event.id,
-                  ),
+                  onPressed: () => ref
+                      .read(careEventRepositoryProvider)
+                      .deleteEvent(plantId: plantId, eventId: event.id),
                   icon: const Icon(Icons.delete_outline, size: 18),
                 ),
               ],
@@ -629,7 +658,10 @@ class _Card extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(title, style: AppText.title.copyWith(color: AppColors.ink)),
+                child: Text(
+                  title,
+                  style: AppText.title.copyWith(color: AppColors.ink),
+                ),
               ),
               ?trailing,
             ],

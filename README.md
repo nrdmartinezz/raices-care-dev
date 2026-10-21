@@ -15,7 +15,7 @@ The signed-in path is: find a plant, add it to the garden, see what to check, lo
 ### Accounts
 
 - Email and password sign-up and sign-in. A new password needs at least 8 characters, an uppercase letter, a lowercase letter, a number, and a special character. Signing in still accepts an existing shorter password.
-- Google sign-in. The first success creates the account and the profile. Apple sign-in is implemented and hidden until there is an Apple Developer account.
+- Google sign-in. The first success creates the account and the profile. Sign in with Apple sits beside Google.
 - Password reset, a web-only "Remember me" session, and account settings for email, phone, and password.
 - Sign-out and in-app account deletion. Email verification is sent at sign-up and is not required to use the app.
 
@@ -43,10 +43,10 @@ The signed-in path is: find a plant, add it to the garden, see what to check, lo
 
 These are the gaps that still sit between the screens above and a small store beta. Missing optional ideas (weather-adjusted watering, identification, a social feed, subscriptions) are out of scope.
 
-- **Notifications.** `flutter_local_notifications` is a dependency and is not called. The home and chores screens work without notification permission. Server push stays a dry run until `FCM_SERVICE_ACCOUNT_JSON` is set and `DRY_RUN_PUSH` is `"false"`. A reminder on a physical device has not been tested here. Daylight-saving and time-zone changes are not described for the gardener.
+- **Notifications.** After the first plant is saved, the app asks for permission and registers this device's FCM token with the Worker. Foreground alerts use `flutter_local_notifications`. The home and chores screens work if permission is declined. The Worker cron sends due reminders, and it stays a dry run until `FCM_SERVICE_ACCOUNT_JSON` is set. `DRY_RUN_PUSH` is already `"false"`. A reminder on a physical device has not been tested here. Daylight-saving and time-zone changes are not described for the gardener.
 - **Catalog.** Three sample profiles are not a reviewed launch set. Search against Trefle can return a plant whose care cadence is a default.
 - **Account deletion.** Deleting the profile wakes `onUserDeleted`, which removes that user's plants, care history, reminders, gardens, settings, and photo files. The Worker `DELETE /v1/me` path does the same for its rows and R2 objects, and the app calls it before the Auth user is removed. There is no privacy policy and no public page for a deletion request. Store policy still needs a separate review. The function has to be deployed for the Firestore cleanup to run.
-- **Apple on iOS.** The Apple button is off. Shipping Google sign-in on iOS requires Sign in with Apple before an App Store release.
+- **Apple on iOS.** The Apple button is on. App Store review still needs the Apple provider saved in Firebase (Services ID, Team ID, Key ID, and the `.p8`, which must not be committed) and a public privacy policy URL. The portal steps are in [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md).
 - **Connectivity.** Saves need a network connection. There is no offline queue, so a failed save has to be sent again by the gardener. The Worker accepts an idempotency key so a retried care log does not become a second event.
 - **Environments.** Development and production share the Firebase project `raices-care`. The planned `.dev` application id is not configured. `api.raices.care` is not routed. Do not run `wrangler deploy` or a remote D1 migration from this repo.
 
@@ -278,9 +278,9 @@ deleted and re-logged rather than silently rewritten.
 | `prepareImageUpload` | callable | Signs a JPEG upload to R2 for the signed-in user |
 | `deleteImage` | callable | Deletes one of that user's objects from R2 |
 
-Notification delivery is **off**. `functions/src/reminders.ts` sets `SENDING_ENABLED = false`,
-so the sweep logs what it would send instead of sending it. Flip that only after testing
-against the emulator.
+Notification delivery from Cloud Functions is **off**. `functions/src/reminders.ts` sets
+`SENDING_ENABLED = false`. Care reminders are sent by the Worker cron in `backend/`, which
+stays a dry run until `FCM_SERVICE_ACCOUNT_JSON` is set.
 
 Build them before anything else, since the emulator serves compiled output from `lib/`:
 
@@ -350,7 +350,7 @@ Set the token for a single shell only. Do not put it in a file.
 
 `backend/` is a Worker (Hono) in front of the existing D1 database `raices-care-sql` and the private R2 bucket `raices-care-images`. Firebase Auth stays. Firestore and the Cloud Functions stay in the app until a signed-in create, care log, and photo round-trip succeed against local `wrangler dev`.
 
-Nothing in this directory is deployed from here. Do not run `wrangler deploy` or a remote D1 migration. Secrets go in `backend/.dev.vars` (gitignored) or `wrangler secret put`. FCM stays a dry run until `FCM_SERVICE_ACCOUNT_JSON` is set and `DRY_RUN_PUSH` is `"false"`.
+Nothing in this directory is deployed from here. Do not run `wrangler deploy` or a remote D1 migration. Secrets go in `backend/.dev.vars` (gitignored) or `wrangler secret put`. FCM stays a dry run until `FCM_SERVICE_ACCOUNT_JSON` is set with `wrangler secret put`. `DRY_RUN_PUSH` is already `"false"`.
 
 ```powershell
 cd backend

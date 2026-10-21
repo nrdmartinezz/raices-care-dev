@@ -299,7 +299,14 @@ async function sendFcm(
       },
     );
     if (!response.ok) {
-      console.log(JSON.stringify({ message: "push_failed", status: response.status }));
+      const raw = await response.text();
+      const dropToken = fcmErrorDropsToken(response.status, raw);
+      console.log(
+        JSON.stringify({ message: "push_failed", status: response.status, dropToken }),
+      );
+      if (dropToken) {
+        await env.DB.prepare("DELETE FROM device_tokens WHERE token = ?").bind(token).run();
+      }
       return false;
     }
     return true;
@@ -307,6 +314,32 @@ async function sendFcm(
     console.log(JSON.stringify({ message: "push_failed", error: String(error) }));
     return false;
   }
+}
+
+/** An unregistered or malformed registration token should leave `device_tokens`. */
+export function fcmErrorDropsToken(status: number, body: string): boolean {
+  if (status === 404) return true;
+  let parsed: {
+    error?: {
+      message?: string;
+      status?: string;
+      details?: { errorCode?: string }[];
+    };
+  };
+  try {
+    parsed = JSON.parse(body) as typeof parsed;
+  } catch {
+    return false;
+  }
+  const codes = (parsed.error?.details ?? [])
+    .map((detail) => detail.errorCode)
+    .filter((code): code is string => typeof code === "string");
+  if (codes.includes("UNREGISTERED")) return true;
+  const aboutToken = /registration token/i.test(parsed.error?.message ?? "");
+  return (
+    aboutToken &&
+    (codes.includes("INVALID_ARGUMENT") || parsed.error?.status === "INVALID_ARGUMENT")
+  );
 }
 
 async function googleAccessToken(account: ServiceAccount): Promise<string> {

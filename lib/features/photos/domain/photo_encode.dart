@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
 import '../../../core/errors/app_exception.dart';
@@ -60,6 +59,21 @@ Uint8List encodeGardenJpeg(Uint8List bytes, {required PhotoCrop crop}) {
     PhotoCrop.landscape => _fitLongestEdge(decoded, crop.maxEdge),
   };
   return img.encodeJpg(resized, quality: gardenJpegQuality);
+}
+
+/// Encodes an already-framed photo off the UI isolate.
+///
+/// The crop editor has produced the pixels inside the frame. This only applies
+/// the upload size and JPEG quality.
+Future<Uint8List> encodeGardenUpload(
+  Uint8List bytes, {
+  required PhotoCrop crop,
+}) {
+  return compute(_encodeGardenUpload, (bytes, crop.index));
+}
+
+Uint8List _encodeGardenUpload((Uint8List, int) job) {
+  return encodeGardenJpeg(job.$1, crop: PhotoCrop.values[job.$2]);
 }
 
 /// Shrinks [bytes] so the crop screen never decodes a camera original.

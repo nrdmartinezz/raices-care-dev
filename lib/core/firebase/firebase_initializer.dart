@@ -16,9 +16,7 @@ import 'emulator_config.dart';
 /// Firebase through a repository, never by touching these instances directly.
 abstract final class FirebaseInitializer {
   static Future<void> ensureInitialized() async {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await Firebase.initializeApp(options: _withAuthDomain());
 
     if (kIsWeb) {
       // Phone browsers, Chrome on iOS included, are WebKit. Firestore's
@@ -41,6 +39,20 @@ abstract final class FirebaseInitializer {
     }
 
     await _configureTelemetry();
+  }
+
+  /// Google sign-in on iOS sends the browser back through this host.
+  ///
+  /// `flutterfire configure` leaves [FirebaseOptions.authDomain] empty on
+  /// mobile. Without it the OAuth session has no
+  /// `https://<project>.firebaseapp.com/__/auth/handler` redirect.
+  static FirebaseOptions _withAuthDomain() {
+    final options = DefaultFirebaseOptions.currentPlatform;
+    final domain = options.authDomain;
+    if (domain != null && domain.isNotEmpty) {
+      return options;
+    }
+    return options.copyWith(authDomain: '${options.projectId}.firebaseapp.com');
   }
 
   static void _connectEmulators() {

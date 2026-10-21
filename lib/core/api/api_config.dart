@@ -2,11 +2,17 @@ import 'package:flutter/foundation.dart';
 
 /// Set with `--dart-define=API_BASE_URL=...`.
 ///
-/// A debug build with no define uses the local Worker. Release builds still
-/// require a hosted URL, and an empty release URL keeps the Firestore path.
+/// A debug build with no define uses the local Worker. A release build with
+/// no define uses [hostedWorkerOrigin]. An explicit define always wins.
 const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
-bool get usesWorkerApi => apiBaseUrl.isNotEmpty || kDebugMode;
+/// Public Worker until `api.raices.care` has DNS. Records live in D1 and
+/// photo bytes in R2.
+const hostedWorkerOrigin = 'https://raices-api.nrd-martinezz.workers.dev';
+
+/// Every build has a Worker. Debug uses this machine. Release uses
+/// [hostedWorkerOrigin] unless [apiBaseUrl] is set.
+bool get usesWorkerApi => true;
 
 /// Release builds must name a hosted API. Debug may use localhost, and the
 /// Android emulator reaches the host at 10.0.2.2.
@@ -33,7 +39,7 @@ Uri get configuredApiBase {
     return resolveApiBaseUrl(apiBaseUrl, release: kReleaseMode);
   }
   if (kDebugMode) return localWorkerBase();
-  throw StateError('API_BASE_URL is not set.');
+  return Uri.parse(hostedWorkerOrigin);
 }
 
 /// The Worker on this machine. Android emulator traffic uses 10.0.2.2.
@@ -44,11 +50,5 @@ Uri localWorkerBase() {
   return Uri.parse('http://$host:8787');
 }
 
-/// Where sowing calendars are loaded from.
-///
-/// Debug builds use [configuredApiBase]. A release build with no hosted URL
-/// has no calendar API.
-Uri? get plantingApiBase {
-  if (apiBaseUrl.isEmpty && !kDebugMode) return null;
-  return configuredApiBase;
-}
+/// Where sowing calendars are loaded from. Same origin as the rest of the API.
+Uri get plantingApiBase => configuredApiBase;

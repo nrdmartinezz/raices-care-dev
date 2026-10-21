@@ -66,9 +66,14 @@ class WorkerBackend {
     );
   }
 
-  Stream<Plant?> watchPlant(String plantId) {
-    unawaited(_pullPlants());
-    return _database.watchCollection('plants').map((rows) {
+  Stream<Plant?> watchPlant(String plantId) async* {
+    final cached = await _database.readDocument('plants', plantId);
+    if (cached == null) {
+      await _refreshPlant(plantId);
+    } else {
+      unawaited(_pullPlants());
+    }
+    yield* _database.watchCollection('plants').map((rows) {
       for (final row in rows) {
         if (row.id == plantId) return _plant(row.payload);
       }
@@ -77,9 +82,16 @@ class WorkerBackend {
   }
 
   Future<Plant?> getPlant(String plantId) async {
-    await _pullPlants();
-    final row = await _database.readDocument('plants', plantId);
-    return row == null ? null : _plant(row.payload);
+    final cached = await _database.readDocument('plants', plantId);
+    if (cached != null) {
+      unawaited(_pullPlants());
+      return _plant(cached.payload);
+    }
+    try {
+      return await _refreshPlant(plantId);
+    } on NotFoundException {
+      return null;
+    }
   }
 
   Future<String> createPlant(Plant plant) async {
@@ -137,7 +149,7 @@ class WorkerBackend {
 
   Future<void> loadCare(String plantId) async {
     final json = await _client.sendJson('POST', '/v1/plants/$plantId/care');
-    await _mergePlant(plantId, {
+    await _refreshPlantOrMerge(plantId, {
       'careTasks': json['careTasks'],
       'difficulty': json['difficulty'],
       'light': json['light'],
@@ -163,7 +175,7 @@ class WorkerBackend {
         ],
       },
     );
-    await _mergePlant(plantId, {
+    await _refreshPlantOrMerge(plantId, {
       'careTasks': json['careTasks'],
       'difficulty': json['difficulty'],
       'light': json['light'],
@@ -185,6 +197,19 @@ class WorkerBackend {
     );
   }
 
+  /// Stores the D1 plant, including its revision. If that read fails, keep the
+  /// care fields that the care call just returned.
+  Future<void> _refreshPlantOrMerge(
+    String plantId,
+    Map<String, Object?> extra,
+  ) async {
+    try {
+      await _refreshPlant(plantId);
+    } on AppException {
+      await _mergePlant(plantId, extra);
+    }
+  }
+
   Future<void> updatePlant(Plant plant) {
     return patchPlant(plant.id, {
       'nickname': plant.displayName,
@@ -203,37 +228,33 @@ class WorkerBackend {
 
   /// Writes a partial plant update to D1. Keys absent from [changes] stay as
   /// they are, including [ageFrom] when the gardener has not edited the age.
+  ///
+  /// The phone keeps its previous copy until D1 accepts the row. A revision
+  /// conflict, from care or a photo delete, is retried once against the
+  /// current revision. A rejected save puts that previous copy back.
   Future<void> patchPlant(String plantId, Map<String, Object?> changes) async {
     final cached = await _database.readDocument('plants', plantId);
-    final json = cached == null ? <String, dynamic>{} : _json(cached.payload);
-    final revision = json['revision'];
-    json.addAll(changes);
-    if (cached != null) {
-      await _database.saveDocument(
-        collection: 'plants',
-        id: plantId,
-        parentId: cached.parentId,
-        payload: jsonEncode(json),
-      );
-    }
+    final previous = cached?.payload;
+    final revision = cached == null ? null : _json(cached.payload)['revision'];
     try {
-      // Watering and a cover-photo delete advance the plant revision on their
-      // own, so the save reads the current one instead of the cached copy.
-      final latest = await _client.getJson('/v1/plants/$plantId');
-      final current = latest['revision'] ?? revision;
-      final saved = await _client.sendJson(
-        'PATCH',
-        '/v1/plants/$plantId',
-        body: changes,
-        ifMatch: current?.toString(),
-      );
+      final saved = await _patchRemote(plantId, changes, revision);
       await _database.saveDocument(
         collection: 'plants',
         id: plantId,
-        parentId: cached?.parentId ?? _spot(saved['gardenId'] as String?),
+        parentId: cached?.parentId ?? _spot(_text(saved['gardenId'])),
         payload: jsonEncode(saved),
       );
     } on NetworkException {
+      if (cached != null) {
+        final json = _json(cached.payload);
+        json.addAll(changes);
+        await _database.saveDocument(
+          collection: 'plants',
+          id: plantId,
+          parentId: cached.parentId,
+          payload: jsonEncode(json),
+        );
+      }
       await _queue(
         id: 'plant-update-$plantId',
         method: 'PATCH',
@@ -241,6 +262,40 @@ class WorkerBackend {
         body: changes,
         ifMatch: revision?.toString(),
       );
+    } on Object {
+      if (previous != null && cached != null) {
+        await _database.saveDocument(
+          collection: 'plants',
+          id: plantId,
+          parentId: cached.parentId,
+          payload: previous,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> _patchRemote(
+    String plantId,
+    Map<String, Object?> changes,
+    Object? fallbackRevision,
+  ) async {
+    Future<Map<String, dynamic>> send(Object? revision) {
+      return _client.sendJson(
+        'PATCH',
+        '/v1/plants/$plantId',
+        body: changes,
+        ifMatch: revision?.toString(),
+      );
+    }
+
+    final latest = await _client.getJson('/v1/plants/$plantId');
+    try {
+      return await send(latest['revision'] ?? fallbackRevision);
+    } on UnexpectedException catch (error) {
+      if (!isConflict(error)) rethrow;
+      final again = await _client.getJson('/v1/plants/$plantId');
+      return send(again['revision']);
     }
   }
 
@@ -417,9 +472,9 @@ class WorkerBackend {
 
   Stream<List<Observation>> watchJournal(String plantId) {
     unawaited(_pullJournal(plantId));
-    return _database.watchCollection('journal', parentId: plantId).map(
-      (rows) => rows.map((row) => _journal(row.payload)).toList(),
-    );
+    return _database
+        .watchCollection('journal', parentId: plantId)
+        .map((rows) => rows.map((row) => _journal(row.payload)).toList());
   }
 
   Future<void> addJournalNote({
@@ -688,7 +743,11 @@ class WorkerBackend {
   }) async {
     await _database.removeDocument('photos', photo.id);
     await _client.sendJson('DELETE', '/v1/photos/${photo.id}');
-    await _pullPlants();
+    try {
+      await _refreshPlant(plantId);
+    } on AppException {
+      // The photo is already gone. The next plant read picks up the revision.
+    }
   }
 
   Future<String> uploadAvatar({
@@ -927,18 +986,40 @@ class WorkerBackend {
       final json = await _client.getJson('/v1/plants/$plantId/photos');
       final results = json['results'];
       if (results is! List) return;
+      final kept = <String>{};
       for (final item in results) {
         if (item is! Map<String, dynamic>) continue;
+        final id = item['id'];
+        if (id is! String || id.isEmpty) continue;
+        kept.add(id);
         await _database.saveDocument(
           collection: 'photos',
-          id: item['id'] as String,
+          id: id,
           parentId: plantId,
           payload: jsonEncode(item),
         );
       }
+      final local = await _database.documents('photos', parentId: plantId);
+      for (final row in local) {
+        if (kept.contains(row.id)) continue;
+        await _database.removeDocument('photos', row.id);
+      }
     } on NetworkException {
       return;
     }
+  }
+
+  /// Reads one plant from D1 and stores that row, including its revision.
+  Future<Plant> _refreshPlant(String plantId) async {
+    final json = await _client.getJson('/v1/plants/$plantId');
+    final id = _text(json['id']) ?? plantId;
+    await _database.saveDocument(
+      collection: 'plants',
+      id: id,
+      parentId: _spot(_text(json['gardenId'])),
+      payload: jsonEncode(json),
+    );
+    return _plant(jsonEncode(json));
   }
 
   Stream<List<Reminder>> _reminders() {
@@ -986,6 +1067,14 @@ class WorkerBackend {
 
   String _gardenName(String spot) => spot.replaceAll('_', ' ');
 
+  String? _text(Object? value) => value is String ? value : null;
+
+  int? _count(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return null;
+  }
+
   String? _spot(String? gardenId) {
     if (gardenId == null) return null;
     final prefix = '$_user--';
@@ -998,7 +1087,7 @@ class WorkerBackend {
     final archivedAt = json['archivedAt'];
     return Plant(
       id: json['id'] as String,
-      speciesId: (json['speciesId'] as String?) ?? 'unknown',
+      speciesId: json['speciesId'] is String ? json['speciesId'] as String : '',
       displayName:
           (json['nickname'] as String?) ??
           (json['speciesName'] as String?) ??
@@ -1036,7 +1125,8 @@ class WorkerBackend {
       careLight: _careText(json['light']),
       careSourceUrl: _careText(json['sourceUrl']),
       careSourceLabel:
-          _careText(json['sourceLabel']) ?? _sourceLabel(_careText(json['sourceUrl'])),
+          _careText(json['sourceLabel']) ??
+          _sourceLabel(_careText(json['sourceUrl'])),
       createdAt: _time(json['createdAt']),
       updatedAt: _time(json['updatedAt']),
     );
@@ -1113,7 +1203,7 @@ class WorkerBackend {
       id: id,
       storagePath: '$workerPhotoPrefix$id',
       caption: json['caption'] as String?,
-      sizeBytes: json['byteSize'] as int?,
+      sizeBytes: _count(json['byteSize']),
       contentType: json['contentType'] as String?,
       createdAt: _time(json['createdAt']),
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -52,7 +54,7 @@ class UserSettingsRepository {
         return false;
       }
 
-      final token = await _messaging.getToken();
+      final token = await _deviceToken();
       if (token != null) {
         await registerDeviceToken(token);
       }
@@ -73,11 +75,41 @@ class UserSettingsRepository {
       if (!granted) {
         return;
       }
-      final token = await _messaging.getToken();
+      final token = await _deviceToken();
       if (token != null) {
         await registerDeviceToken(token);
       }
     });
+  }
+
+  /// FCM token for this device. On iOS, [FirebaseMessaging.getToken] fails
+  /// until APNs has issued one, which can lag the permission grant.
+  Future<String?> _deviceToken() async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      final apns = await _waitForApnsToken();
+      if (apns == null) {
+        return null;
+      }
+    }
+    try {
+      return await _messaging.getToken().timeout(const Duration(seconds: 5));
+    } on TimeoutException {
+      return null;
+    }
+  }
+
+  Future<String?> _waitForApnsToken() async {
+    const attempts = 5;
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      final token = await _messaging.getAPNSToken();
+      if (token != null) {
+        return token;
+      }
+      if (attempt < attempts - 1) {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+    }
+    return null;
   }
 
   Future<void> registerDeviceToken(String token) {

@@ -191,3 +191,10 @@ class ApiClient {
     return const {};
   }
 }
+
+/// True when D1 rejected the write because the plant revision moved.
+bool isConflict(Object error) {
+  if (error is! UnexpectedException) return false;
+  final cause = error.cause;
+  return cause is DioException && cause.response?.statusCode == 409;
+}

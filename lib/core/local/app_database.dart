@@ -60,6 +60,18 @@ class AppDatabase extends _$AppDatabase {
     return query.watch();
   }
 
+  Future<List<CachedDocument>> documents(
+    String collection, {
+    String? parentId,
+  }) {
+    final query = select(cachedDocuments)
+      ..where((row) => row.collection.equals(collection));
+    if (parentId != null) {
+      query.where((row) => row.parentId.equals(parentId));
+    }
+    return query.get();
+  }
+
   Future<CachedDocument?> readDocument(String collection, String id) {
     return (select(cachedDocuments)..where(
           (row) => row.collection.equals(collection) & row.id.equals(id),
@@ -132,10 +144,9 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<List<PendingOperation>> pending() {
-    return (select(pendingOperations)..orderBy([
-          (row) => OrderingTerm.asc(row.createdAt),
-        ]))
-        .get();
+    return (select(
+      pendingOperations,
+    )..orderBy([(row) => OrderingTerm.asc(row.createdAt)])).get();
   }
 
   Future<void> dropPending(String id) {
@@ -143,9 +154,9 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> notePendingFailure(String id, String message) async {
-    final row = await (select(pendingOperations)
-          ..where((row) => row.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (select(
+      pendingOperations,
+    )..where((row) => row.id.equals(id))).getSingleOrNull();
     if (row == null) return;
     await (update(pendingOperations)..where((row) => row.id.equals(id))).write(
       PendingOperationsCompanion(

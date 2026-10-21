@@ -222,6 +222,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               enabled: !busy,
               onGoogle: () =>
                   ref.read(authControllerProvider.notifier).signInWithGoogle(),
+              onApple: () =>
+                  ref.read(authControllerProvider.notifier).signInWithApple(),
             ),
             Padding(
               padding: const EdgeInsets.only(top: 24),

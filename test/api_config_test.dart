@@ -29,4 +29,10 @@ void main() {
     final uri = resolveApiBaseUrl('https://api.raices.care', release: true);
     expect(uri.host, 'api.raices.care');
   });
+
+  test('the default release Worker is hosted', () {
+    final uri = resolveApiBaseUrl(hostedWorkerOrigin, release: true);
+    expect(uri.scheme, 'https');
+    expect(uri.host, 'raices-api.nrd-martinezz.workers.dev');
+  });
 }

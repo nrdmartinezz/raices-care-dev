@@ -3,7 +3,7 @@ import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type CryptoKey 
 import { beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app";
 import type { Env } from "../src/env";
-import { runReminderCron } from "../src/services/push";
+import { fcmErrorDropsToken, runReminderCron } from "../src/services/push";
 
 const DAY = 24 * 60 * 60 * 1000;
 const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0x00, 0xd9]);
@@ -399,6 +399,46 @@ describe("reminders", () => {
   });
 });
 
+describe("fcm token errors", () => {
+  it("drops an unregistered token", () => {
+    const body = JSON.stringify({
+      error: {
+        code: 404,
+        message: "Requested entity was not found.",
+        status: "NOT_FOUND",
+        details: [{ errorCode: "UNREGISTERED" }],
+      },
+    });
+    expect(fcmErrorDropsToken(404, body)).toBe(true);
+    expect(fcmErrorDropsToken(404, "")).toBe(true);
+  });
+
+  it("drops a malformed registration token", () => {
+    const body = JSON.stringify({
+      error: {
+        code: 400,
+        message: "The registration token is not a valid FCM registration token",
+        status: "INVALID_ARGUMENT",
+        details: [{ errorCode: "INVALID_ARGUMENT" }],
+      },
+    });
+    expect(fcmErrorDropsToken(400, body)).toBe(true);
+  });
+
+  it("keeps the token when the message itself is rejected", () => {
+    const body = JSON.stringify({
+      error: {
+        code: 400,
+        message: "Android notification channel is invalid.",
+        status: "INVALID_ARGUMENT",
+        details: [{ errorCode: "INVALID_ARGUMENT" }],
+      },
+    });
+    expect(fcmErrorDropsToken(400, body)).toBe(false);
+    expect(fcmErrorDropsToken(500, "upstream")).toBe(false);
+  });
+});
+
 async function seedNotifier(
   userId: string,
   options: { timezone?: string; lastOpenedAt?: number } = {},
@@ -730,6 +770,57 @@ describe("plant edits", () => {
     ).first<{ scientific_name: string; updated_at: number }>();
     expect(species?.scientific_name).toBe("Monstera deliciosa");
     expect(species?.updated_at).toBe(ts);
+  });
+
+  it("patches a plant after care assignment advances the revision", async () => {
+    await call(
+      "/v1/gardens",
+      dev("care-editor", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "garden-care-rev", name: "Kitchen" }),
+      }),
+    );
+    const created = await call(
+      "/v1/plants",
+      dev("care-editor", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: "plant-care-rev",
+          gardenId: "garden-care-rev",
+          nickname: "B",
+        }),
+      }),
+    );
+    expect(created.status).toBe(201);
+
+    const care = await call(
+      "/v1/plants/plant-care-rev/care",
+      dev("care-editor", { method: "POST" }),
+    );
+    expect(care.status).toBe(200);
+
+    const current = await call("/v1/plants/plant-care-rev", dev("care-editor"));
+    expect(current.status).toBe(200);
+    const row = (await current.json()) as { revision: number };
+    expect(row.revision).toBeGreaterThan(1);
+
+    const patched = await call(
+      "/v1/plants/plant-care-rev",
+      dev("care-editor", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "if-match": String(row.revision),
+        },
+        body: JSON.stringify({ nickname: "Basil" }),
+      }),
+    );
+    expect(patched.status).toBe(200);
+    const body = (await patched.json()) as { nickname: string; revision: number };
+    expect(body.nickname).toBe("Basil");
+    expect(body.revision).toBe(row.revision + 1);
   });
 
   it("adds, updates, and deletes journal notes for the plant", async () => {

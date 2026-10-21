@@ -23,8 +23,8 @@ class PhotoCropScreen extends StatefulWidget {
 }
 
 class _PhotoCropScreenState extends State<PhotoCropScreen> {
+  final _controller = CropController();
   Uint8List? _bytes;
-  Rect? _imageRect;
   var _ready = false;
   var _saving = false;
   var _left = false;
@@ -71,43 +71,53 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
     Navigator.of(context).pop(result);
   }
 
-  Future<void> _save() async {
-    final bytes = _bytes;
-    final source = _imageRect;
-    if (!_ready || _saving || bytes == null || source == null) {
+  void _save() {
+    if (!_ready || _saving || _bytes == null) {
       return;
     }
     setState(() {
       _saving = true;
       _error = null;
     });
-    await WidgetsBinding.instance.endOfFrame;
+    // Crop runs against the frame under the circle after pan and pinch.
+    // The rectangle from the first layout is the pre-zoom frame.
+    _controller.crop();
+  }
+
+  Future<void> _onCropped(CropResult result) async {
     if (!mounted || _left) {
       return;
     }
-    try {
-      final jpeg = await finishGardenCrop(
-        bytes: bytes,
-        source: source,
-        crop: widget.crop,
-      );
-      _leave(jpeg);
-    } on AppException catch (error) {
-      if (!mounted || _left) {
-        return;
-      }
-      setState(() {
-        _saving = false;
-        _error = error.message;
-      });
-    } on Object {
-      if (!mounted || _left) {
-        return;
-      }
-      setState(() {
-        _saving = false;
-        _error = 'That crop could not be saved.';
-      });
+    switch (result) {
+      case CropFailure():
+        setState(() {
+          _saving = false;
+          _error = 'That crop could not be saved.';
+        });
+      case CropSuccess(:final croppedImage):
+        try {
+          final jpeg = await encodeGardenUpload(
+            croppedImage,
+            crop: widget.crop,
+          );
+          _leave(jpeg);
+        } on AppException catch (error) {
+          if (!mounted || _left) {
+            return;
+          }
+          setState(() {
+            _saving = false;
+            _error = error.message;
+          });
+        } on Object {
+          if (!mounted || _left) {
+            return;
+          }
+          setState(() {
+            _saving = false;
+            _error = 'That crop could not be saved.';
+          });
+        }
     }
   }
 
@@ -125,46 +135,7 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                 style: AppText.display.copyWith(color: AppColors.ink),
               ),
             ),
-            Expanded(
-              child: _bytes == null
-                  ? Center(
-                      child: _error == null
-                          ? const CircularProgressIndicator(
-                              color: AppColors.terracotta,
-                            )
-                          : const SizedBox.shrink(),
-                    )
-                  : Crop(
-                      image: _bytes!,
-                      aspectRatio: widget.crop.aspectRatio,
-                      withCircleUi: widget.crop.circularMask,
-                      interactive: true,
-                      fixCropRect: true,
-                      baseColor: AppColors.canvas,
-                      maskColor: AppColors.ink.withValues(alpha: 0.45),
-                      initialRectBuilder: InitialRectBuilder.withSizeAndRatio(
-                        size: 0.85,
-                        aspectRatio: widget.crop.aspectRatio,
-                      ),
-                      cornerDotBuilder: (size, edgeAlignment) =>
-                          DotControl(color: AppColors.terracotta),
-                      progressIndicator: const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.terracotta,
-                        ),
-                      ),
-                      onStatusChanged: (status) {
-                        if (!mounted) {
-                          return;
-                        }
-                        setState(() => _ready = status == CropStatus.ready);
-                      },
-                      onMoved: (_, imageRect) {
-                        _imageRect = imageRect;
-                      },
-                      onCropped: (_) {},
-                    ),
-            ),
+            Expanded(child: _editor()),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -190,7 +161,7 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
                     child: AppDialogButton(
                       label: _saving ? 'Saving…' : 'Use photo',
                       filled: true,
-                      onPressed: () => unawaited(_save()),
+                      onPressed: _save,
                     ),
                   ),
                 ],
@@ -199,6 +170,55 @@ class _PhotoCropScreenState extends State<PhotoCropScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _editor() {
+    final bytes = _bytes;
+    if (bytes == null) {
+      return Center(
+        child: _error == null
+            ? const CircularProgressIndicator(color: AppColors.terracotta)
+            : const SizedBox.shrink(),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The package sizes its circle from MediaQuery, which is the whole
+        // phone. The title and buttons sit outside this pane, so the circle
+        // has to be centered on the pane the gardener can see.
+        final pane = Size(constraints.maxWidth, constraints.maxHeight);
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(size: pane),
+          child: Crop(
+            image: bytes,
+            controller: _controller,
+            aspectRatio: widget.crop.aspectRatio,
+            withCircleUi: widget.crop.circularMask,
+            interactive: true,
+            fixCropRect: true,
+            baseColor: AppColors.canvas,
+            maskColor: AppColors.ink.withValues(alpha: 0.45),
+            initialRectBuilder: InitialRectBuilder.withSizeAndRatio(
+              size: 0.85,
+              aspectRatio: widget.crop.aspectRatio,
+            ),
+            cornerDotBuilder: (size, edgeAlignment) =>
+                DotControl(color: AppColors.terracotta),
+            progressIndicator: const Center(
+              child: CircularProgressIndicator(color: AppColors.terracotta),
+            ),
+            onStatusChanged: (status) {
+              if (!mounted) {
+                return;
+              }
+              setState(() => _ready = status == CropStatus.ready);
+            },
+            onCropped: (result) => unawaited(_onCropped(result)),
+          ),
+        );
+      },
     );
   }
 }

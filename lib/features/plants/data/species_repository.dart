@@ -176,21 +176,27 @@ final speciesRepositoryProvider = Provider<SpeciesRepository>((ref) {
 
 /// Watched, not fetched: `resolveSpecies` may still be filling the record in
 /// when a plant's profile first opens.
-final speciesProvider = StreamProvider.family<Species?, String>(
-  (ref, speciesId) =>
-      ref.watch(speciesRepositoryProvider).watchSpecies(speciesId),
-);
+final speciesProvider = StreamProvider.family<Species?, String>((
+  ref,
+  speciesId,
+) {
+  if (speciesId.isEmpty) return Stream.value(null);
+  return ref.watch(speciesRepositoryProvider).watchSpecies(speciesId);
+});
 
 /// Every schedule the catalog derived for a species. The profile shows the
 /// watering cadence from the first one.
-final careProfilesProvider = FutureProvider.family<List<CareProfile>, String>(
-  (ref, speciesId) =>
-      ref.watch(speciesRepositoryProvider).getCareProfiles(speciesId),
-);
+final careProfilesProvider = FutureProvider.family<List<CareProfile>, String>((
+  ref,
+  speciesId,
+) {
+  if (speciesId.isEmpty) return const [];
+  return ref.watch(speciesRepositoryProvider).getCareProfiles(speciesId);
+});
 
 /// Provenance for one species, including the licence credit the UI must show.
 final speciesSourcesProvider =
-    FutureProvider.family<List<SpeciesSource>, String>(
-      (ref, speciesId) =>
-          ref.watch(speciesRepositoryProvider).getSources(speciesId),
-    );
+    FutureProvider.family<List<SpeciesSource>, String>((ref, speciesId) {
+      if (speciesId.isEmpty) return const [];
+      return ref.watch(speciesRepositoryProvider).getSources(speciesId);
+    });

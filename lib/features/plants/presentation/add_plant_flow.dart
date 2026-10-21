@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -235,14 +237,23 @@ class AddPlantFlowState extends ConsumerState<AddPlantFlow> {
   }
 
   /// The plant is already saved if this fails. Web never prompts.
+  ///
+  /// iOS can leave [FirebaseMessaging.getToken] pending when APNs never
+  /// answers. That must not keep the save button spinning after the plant
+  /// exists.
   Future<void> _offerCareNotifications() async {
     if (kIsWeb) {
       return;
     }
     try {
-      await ref.read(userSettingsRepositoryProvider).enablePushNotifications();
+      await ref
+          .read(userSettingsRepositoryProvider)
+          .enablePushNotifications()
+          .timeout(const Duration(seconds: 8));
     } on AppException {
       // Permission can be granted on a later launch.
+    } on TimeoutException {
+      // Same: the plant is saved, and a later launch can register the token.
     }
   }
 

@@ -35,23 +35,46 @@ class _Rule extends StatelessWidget {
   const _Rule();
 
   @override
-  Widget build(BuildContext context) =>
-      const ColoredBox(color: AppColors.surfaceClay, child: SizedBox(height: 1));
+  Widget build(BuildContext context) => const ColoredBox(
+    color: AppColors.surfaceClay,
+    child: SizedBox(height: 1),
+  );
 }
 
-/// Google, on its own until Apple sign-in is worth the developer account.
+/// Apple beside Google. App Store review requires Apple whenever another
+/// social sign-in is offered, and the same row is used on every platform.
 class SocialSignInRow extends StatelessWidget {
-  const SocialSignInRow({super.key, this.onGoogle, this.enabled = true});
+  const SocialSignInRow({
+    super.key,
+    this.onGoogle,
+    this.onApple,
+    this.enabled = true,
+  });
 
   final VoidCallback? onGoogle;
+  final VoidCallback? onApple;
   final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return _SocialButton(
-      icon: AppIcons.socialGoogle,
-      label: 'Continue with Google',
-      onTap: enabled ? onGoogle : null,
+    return Row(
+      children: [
+        Expanded(
+          child: _SocialButton(
+            icon: AppIcons.socialApple,
+            label: 'Continue with Apple',
+            onTap: enabled ? onApple : null,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _SocialButton(
+            icon: AppIcons.socialGoogle,
+            label: 'Continue with Google',
+            onTap: enabled ? onGoogle : null,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -384,7 +384,7 @@ class Plant {
     final data = snapshot.requireData();
     return Plant(
       id: snapshot.id,
-      speciesId: FirestoreValue.requireText(data['speciesId'], 'speciesId'),
+      speciesId: FirestoreValue.text(data['speciesId']) ?? '',
       displayName: FirestoreValue.requireText(
         data['displayName'],
         'displayName',

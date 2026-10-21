@@ -29,6 +29,15 @@ class SyncEngine {
     });
   }
 
+  bool _isPlantPatch(PendingOperation operation) {
+    if (operation.method != 'PATCH') return false;
+    final parts = [
+      for (final part in operation.path.split('/'))
+        if (part.isNotEmpty) part,
+    ];
+    return parts.length == 3 && parts[0] == 'v1' && parts[1] == 'plants';
+  }
+
   Future<void> dispose() async {
     await _subscription?.cancel();
     _subscription = null;
@@ -41,10 +50,13 @@ class SyncEngine {
     }
     final queued = await _database.pending();
     for (final operation in queued) {
+      Object? body;
+      String? ifMatch;
       try {
-        final decoded = operation.body == null ? null : jsonDecode(operation.body!);
-        Object? body = decoded;
-        String? ifMatch;
+        final decoded = operation.body == null
+            ? null
+            : jsonDecode(operation.body!);
+        body = decoded;
         if (decoded is Map<String, dynamic> && decoded.containsKey('body')) {
           body = decoded['body'];
           final match = decoded['ifMatch'];
@@ -62,6 +74,27 @@ class SyncEngine {
         await _database.notePendingFailure(operation.id, error.message);
         return;
       } catch (error) {
+        if (_isPlantPatch(operation) && isConflict(error)) {
+          try {
+            final latest = await _client.getJson(operation.path);
+            final revision = latest['revision'];
+            await _client.sendJson(
+              operation.method,
+              operation.path,
+              body: body,
+              idempotencyKey: operation.idempotencyKey,
+              ifMatch: revision?.toString(),
+            );
+            await _database.dropPending(operation.id);
+            continue;
+          } on NetworkException catch (retry) {
+            await _database.notePendingFailure(operation.id, retry.message);
+            return;
+          } catch (retry) {
+            await _database.notePendingFailure(operation.id, retry.toString());
+            continue;
+          }
+        }
         await _database.notePendingFailure(operation.id, error.toString());
       }
     }
