@@ -169,11 +169,11 @@ void main() {
     );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Enter new password'),
-      'new-password',
+      'New-password1',
     );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Re-enter new password'),
-      'different-password',
+      'Other-password1',
     );
     await tester.ensureVisible(find.text('Update password'));
     await tester.tap(find.text('Update password'));
