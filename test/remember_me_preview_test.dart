@@ -16,6 +16,7 @@ void main() {
           backgroundColor: Color(0xFFFFFFFF),
           body: Center(
             child: RepaintBoundary(
+              key: const Key('remember-me-preview'),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -32,7 +33,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final boundary = tester.renderObject<RenderRepaintBoundary>(
-      find.byType(RepaintBoundary),
+      find.byKey(const Key('remember-me-preview')),
     );
     final image = await tester.runAsync(
       () => boundary.toImage(pixelRatio: 4),
