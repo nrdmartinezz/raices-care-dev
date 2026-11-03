@@ -18,6 +18,7 @@ import '../features/plants/presentation/plant_detail_screen.dart';
 import '../features/profile/presentation/account_settings_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/profile/presentation/support_screen.dart';
+import '../features/learning/presentation/guide_screen.dart';
 import '../features/wisdom/presentation/species_article_screen.dart';
 import '../features/wisdom/presentation/wisdom_screen.dart';
 import 'shell/app_shell.dart';
@@ -71,6 +72,13 @@ abstract final class ChoresRoute {
 abstract final class WisdomRoute {
   static const name = 'wisdom';
   static const path = '/wisdom';
+}
+
+/// One beginner guide, nested under Wisdom. Declared before the species id
+/// route so "guides" is not opened as a catalog plant.
+abstract final class LearningGuideRoute {
+  static const name = 'learningGuide';
+  static const path = 'guides/:guideId';
 }
 
 /// One catalog species, nested under Wisdom so the nav stays visible.
@@ -262,6 +270,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                     name: WisdomRoute.name,
                     builder: (context, state) => const WisdomScreen(),
                     routes: [
+                      GoRoute(
+                        path: LearningGuideRoute.path,
+                        name: LearningGuideRoute.name,
+                        pageBuilder: (context, state) => _slidePage(
+                          key: state.pageKey,
+                          from: _SlideFrom.end,
+                          child: LearningGuidePage(
+                            guideId: state.pathParameters['guideId']!,
+                          ),
+                        ),
+                      ),
                       GoRoute(
                         path: SpeciesArticleRoute.path,
                         name: SpeciesArticleRoute.name,

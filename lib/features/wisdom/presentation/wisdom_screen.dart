@@ -10,6 +10,7 @@ import '../../../app/shell/app_shell.dart';
 import '../../../app/shell/desktop_header_actions.dart';
 import '../../../app/theme.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../learning/presentation/guide_screen.dart';
 import '../../planting/data/planting_repository.dart';
 import '../../planting/presentation/frost_calendar_card.dart';
 import '../../plants/data/recent_searches.dart';
@@ -90,7 +91,9 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
   Future<Map<String, bool?>> _seasonsFor(List<SpeciesCandidate> results) async {
     final garden = ref.read(gardenFrostProvider).value;
     final repository = ref.read(plantingRepositoryProvider);
-    if (garden is! GardenFrostReady || garden.remembered || repository == null) {
+    if (garden is! GardenFrostReady ||
+        garden.remembered ||
+        repository == null) {
       return const {};
     }
     final names = [
@@ -188,6 +191,7 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
                 )
               else
                 const _WisdomIntro(),
+              const GuidesSection(),
               const SizedBox(height: AppSizes.sectionGap),
               ref
                   .watch(gardenFrostProvider)
@@ -221,7 +225,10 @@ class _WisdomScreenState extends ConsumerState<WisdomScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              _SearchButton(isLoading: _busy, onPressed: _busy ? null : _search),
+              _SearchButton(
+                isLoading: _busy,
+                onPressed: _busy ? null : _search,
+              ),
               if (recents.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _RecentRow(terms: recents, onTap: _busy ? null : _search),

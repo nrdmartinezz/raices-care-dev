@@ -1,0 +1,347 @@
+[
+  {
+    "id": "learn_growing_space",
+    "slug": "understand-your-growing-space",
+    "title": "Understand your growing space",
+    "summary": "Before choosing a plant, get to know the place where it will grow. Light, drainage, water access, and exposure help determine which plants are a good match.",
+    "audience": "beginners",
+    "learning_objectives": [
+      "Observe light rather than guessing from a room's brightness.",
+      "Distinguish container, raised-bed, and in-ground growing.",
+      "Identify drainage and exposure concerns before planting."
+    ],
+    "sections": [
+      {
+        "title": "Choose one growing location",
+        "body": "Start with a specific place: a patio corner, garden bed, or window shelf. Record whether it is indoors, outdoors, or protected by a greenhouse. A greenhouse is not automatically frost-free.",
+        "source_refs": []
+      },
+      {
+        "title": "Observe the light",
+        "body": "Check the location in the morning, around midday, and in the afternoon. Estimate how long direct sun reaches it and note shade from buildings or trees. Repeat observations when seasons change.\n\nOutdoor full-sun crops often need at least six hours of direct sun; follow the selected plant's guidance. Indoor bright indirect light is not interchangeable with outdoor full sun. A room can look bright to a person while offering too little light for seedlings. Consider supplemental lighting when starting seeds indoors. [S1][S2]\n\nIf you have not observed the location yet, select “Not sure” rather than guessing.",
+        "source_refs": ["S1", "S2"]
+      },
+      {
+        "title": "Check the growing method and drainage",
+        "body": "For containers, select a pot with drainage openings and an appropriate growing mix. A decorative outer pot can hold an inner nursery pot, but let the inner pot drain and empty collected water rather than leaving roots standing in it. [S3]\n\nFor garden beds, observe whether water pools after rain or irrigation. Soil texture affects moisture retention and drainage; choose plants and growing methods that suit the site. [S4]",
+        "source_refs": ["S3", "S4"]
+      },
+      {
+        "title": "Notice exposure and practical access",
+        "body": "Record strong wind, reflected heat, shelter, and whether water is easy to reach. These observations are context, not an automatic watering formula. Check the actual growing medium before following a care action.",
+        "source_refs": []
+      },
+      {
+        "title": "Try it in Raíces",
+        "body": "Create one growing location with a name, setting, growing method, and observed light. Exact GPS is not required. You can update the information later.",
+        "source_refs": []
+      }
+    ],
+    "checklist": [
+      "I named a specific growing location.",
+      "I recorded its light or marked it unknown.",
+      "I identified its growing method and drainage concerns.",
+      "I know where its water will come from."
+    ],
+    "knowledge_check": {
+      "question": "Is a bright-looking room always bright enough to start seedlings?",
+      "answer": "No. Seedlings may need supplemental lighting. [S2]"
+    },
+    "next_guide_id": "learn_plant_stages",
+    "source_links": [
+      {
+        "ref": "S1",
+        "publisher": "University of Minnesota Extension",
+        "title": "Raised bed gardens",
+        "url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/raised-bed-gardens"
+      },
+      {
+        "ref": "S2",
+        "publisher": "University of Minnesota Extension",
+        "title": "Lighting for indoor plants and starting seeds",
+        "url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/lighting-for-indoor-plants"
+      },
+      {
+        "ref": "S3",
+        "publisher": "University of Minnesota Extension",
+        "title": "Gardening in the shade",
+        "url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-the-shade"
+      },
+      {
+        "ref": "S4",
+        "publisher": "University of Minnesota Extension",
+        "title": "Tips for climate-ready gardening",
+        "url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/tips-for-climate-ready-gardening"
+      }
+    ],
+    "status": "draft",
+    "version": 1,
+    "reviewed_at": null,
+    "source_accessed_at": "2026-11-02"
+  },
+  {
+    "id": "learn_plant_stages",
+    "slug": "understand-plant-stages",
+    "title": "Understand plant stages",
+    "summary": "A plant's stage is a description of what you observe, not a countdown. Recording changes helps you ask the right care questions without assuming every plant grows on the same schedule.",
+    "audience": "beginners",
+    "learning_objectives": [
+      "Recognize germination, seedlings, leafy growth, and reproductive growth.",
+      "Distinguish seed leaves from true leaves.",
+      "Avoid using age alone to decide when to move a plant."
+    ],
+    "sections": [
+      {
+        "title": "Germination",
+        "body": "Germination is the beginning of growth from a seed. Requirements differ: follow the seed packet for sowing depth, temperature, and whether light or darkness is needed. Do not bury every seed by the same rule. [S1]",
+        "source_refs": ["S1"]
+      },
+      {
+        "title": "Seedling growth",
+        "body": "The first seed leaves are called cotyledons. True leaves develop afterward and resemble the plant's later foliage. Appearance differs among species; do not use a picture of one crop as the identification rule for all crops. [S2]\n\nAs seedlings grow, check light, moisture, and available space. True leaves are useful observations, but they do not alone prove a plant is ready for outdoor transplanting. Outdoor conditions and crop-specific guidance still matter. [S1][S2]",
+        "source_refs": ["S1", "S2"]
+      },
+      {
+        "title": "Vegetative growth",
+        "body": "Use “vegetative growth” in Raíces to record visible development of leaves, stems, or shoots. Treat this as an observation label, not a rule that prohibits a plant from also flowering.",
+        "source_refs": []
+      },
+      {
+        "title": "Flowering and fruit or seed development",
+        "body": "Record visible flowers separately from fruit or seed observations. Do not assume every flower produces a harvest or that a photographed fruit is edible. For edible crops, use the crop's reviewed harvest guidance; seed maturity and eating maturity are not always the same. Oregon State's seed-saving guidance, for example, requires cucumbers to mature beyond their usual eating stage for seed collection. [S3]",
+        "source_refs": ["S3"]
+      },
+      {
+        "title": "Record establishment and uncertainty separately",
+        "body": "A newly planted tree can be mature enough to flower and still be establishing in a new location. In the app, keep “recently planted” separate from flowering observations. If you cannot confidently identify a stage, select “Not sure.” Do not label unexplained leaf loss as dormancy automatically.",
+        "source_refs": []
+      },
+      {
+        "title": "Try it in Raíces",
+        "body": "Record one observation and its date: seed sown, sprout seen, true leaves seen, new growth, flowers seen, or fruit/seed development. A photo is optional.",
+        "source_refs": []
+      }
+    ],
+    "checklist": [
+      "I can explain seed leaves versus true leaves.",
+      "I know plant age is not a universal transplant rule.",
+      "I can record observations without forcing one exclusive stage."
+    ],
+    "knowledge_check": {
+      "question": "Does seeing true leaves mean you should immediately move a plant outside?",
+      "answer": "No. Plant readiness and outdoor conditions must also be suitable. [S1][S2]"
+    },
+    "next_guide_id": "learn_seed_packets",
+    "source_links": [
+      {
+        "ref": "S1",
+        "publisher": "University of Minnesota Extension",
+        "title": "Starting seeds indoors",
+        "url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/starting-seeds-indoors"
+      },
+      {
+        "ref": "S2",
+        "publisher": "Oregon State University Extension",
+        "title": "Growing vegetables in Central Oregon",
+        "url": "https://extension.oregonstate.edu/catalog/pub/em-9128-growing-vegetables-central-oregon"
+      },
+      {
+        "ref": "S3",
+        "publisher": "Oregon State University Extension",
+        "title": "Collecting and storing seeds from your garden",
+        "url": "https://extension.oregonstate.edu/gardening/techniques/collecting-storing-seeds-your-garden"
+      }
+    ],
+    "status": "draft",
+    "version": 1,
+    "reviewed_at": null,
+    "source_accessed_at": "2026-11-02"
+  },
+  {
+    "id": "learn_seed_packets",
+    "slug": "read-a-seed-packet-or-plant-label",
+    "title": "Read a seed packet or plant label",
+    "summary": "A packet or nursery label is the starting instruction sheet for the exact plant you bought. Save its details so you do not have to rely on a general calendar or a common name alone.",
+    "audience": "beginners",
+    "learning_objectives": [
+      "Identify the plant and variety.",
+      "Find sowing, spacing, and timing instructions.",
+      "Treat maturity figures as estimates rather than guaranteed dates."
+    ],
+    "sections": [
+      {
+        "title": "Identify the plant",
+        "body": "Record the common name, scientific name if supplied, and cultivar or variety. Take a readable photo of both sides of the packet or label. If its identity is unclear, keep that uncertainty visible instead of assigning a confident species match.",
+        "source_refs": []
+      },
+      {
+        "title": "Find the planting method",
+        "body": "Look for instructions to sow directly outdoors, start indoors, or plant a nursery transplant. Use the crop-specific directions. Indoor starting is not automatically the best choice for every plant. [S1]",
+        "source_refs": ["S1"]
+      },
+      {
+        "title": "Find depth, spacing, and germination instructions",
+        "body": "Copy sowing depth, final plant spacing, and any thinning instructions separately. Check whether seeds need light, darkness, or special preparation. Seed-specific instructions take priority over generic rules. [S1][S2]\n\nFor nursery plants, record mature size and placement instructions if provided. Do not interpret seed sowing depth as the planting depth for a purchased tree, bulb, or transplant.",
+        "source_refs": ["S1", "S2"]
+      },
+      {
+        "title": "Read timing carefully",
+        "body": "Find the recommended planting season and days to maturity or harvest. Check whether the supplier counts from sowing or transplanting; if it is unclear, mark the basis unknown rather than inventing a harvest date. Weather and regional growing conditions can change actual timing. [S3][S4]\n\nIf the packet says “before last frost,” keep that as a relative instruction until an appropriate regional frost reference is available. Do not convert it into one nationwide date.",
+        "source_refs": ["S3", "S4"]
+      },
+      {
+        "title": "Compare the label with your growing space",
+        "body": "Compare the plant's light, spacing, and growing requirements with your location. If your space does not match, choose another location or plant rather than hiding the mismatch.",
+        "source_refs": []
+      },
+      {
+        "title": "Try it in Raíces",
+        "body": "Save a label photo and manually confirm the important details. Automatic text extraction, if added later, should produce suggestions that the user reviews—not automatically published care guidance.",
+        "source_refs": []
+      }
+    ],
+    "checklist": [
+      "I saved the plant and variety name.",
+      "I know the recommended planting method.",
+      "I recorded depth and spacing separately.",
+      "I know whether maturity timing has a clear starting point.",
+      "I marked missing information as unknown."
+    ],
+    "knowledge_check": {
+      "question": "Does “70 days” always mean 70 days after you buy the packet?",
+      "answer": "No. Establish what the supplier counts from, and treat the result as an estimate. [S3][S4]"
+    },
+    "next_guide_id": "learn_start_seeds",
+    "source_links": [
+      {
+        "ref": "S1",
+        "publisher": "University of Minnesota Extension",
+        "title": "Starting seeds indoors",
+        "url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/starting-seeds-indoors"
+      },
+      {
+        "ref": "S2",
+        "publisher": "Oregon State University Extension",
+        "title": "Growing vegetables in Central Oregon",
+        "url": "https://extension.oregonstate.edu/catalog/pub/em-9128-growing-vegetables-central-oregon"
+      },
+      {
+        "ref": "S3",
+        "publisher": "Oregon State University Extension",
+        "title": "Succession Planting",
+        "url": "https://extension.oregonstate.edu/imported-publication/succession-planting"
+      },
+      {
+        "ref": "S4",
+        "publisher": "Oregon State University Extension",
+        "title": "Growing Your Own",
+        "url": "https://extension.oregonstate.edu/catalog/em-9027-growing-your-own"
+      }
+    ],
+    "status": "draft",
+    "version": 1,
+    "reviewed_at": null,
+    "source_accessed_at": "2026-11-02"
+  },
+  {
+    "id": "learn_start_seeds",
+    "slug": "start-seeds",
+    "title": "Start seeds",
+    "summary": "This beginner guide focuses on starting suitable garden seeds indoors. It is not a universal protocol for tree seeds, specialized succulent propagation, or seeds needing treatments such as cold stratification. Follow the packet and reviewed species guidance for those cases.",
+    "audience": "beginners",
+    "learning_objectives": [
+      "Decide whether indoor starting is appropriate.",
+      "Prepare containers, growing medium, and labels.",
+      "Sow at the correct depth and monitor moisture and light."
+    ],
+    "sections": [
+      {
+        "title": "Before you begin",
+        "body": "Confirm the seed's identity, planting method, and local timing. Starting too early can leave you managing plants indoors longer than expected. Do not use a hardiness zone alone to choose a sowing date; keep dates unset when regional timing has not been reviewed.",
+        "source_refs": []
+      },
+      {
+        "title": "Supplies",
+        "body": "Seeds with readable instructions.\nClean containers or cells with drainage holes.\nSeed-starting mix appropriate for the seed.\nA tray to catch water.\nLabels and a marker.\nA gentle watering method.\nSuitable lighting and a timer if needed.\nAn optional heat mat when the seed requires warmer germination conditions. [S1][S2]",
+        "source_refs": ["S1", "S2"]
+      },
+      {
+        "title": "Step 1. Prepare and label",
+        "body": "Moisten the seed-starting mix before filling containers. Label the plant, variety, and sowing date. Keep drainage openings clear. Individual cells make later handling easier than a crowded shared container. [S1]",
+        "source_refs": ["S1"]
+      },
+      {
+        "title": "Step 2. Sow according to the packet",
+        "body": "Follow the stated depth and any light/darkness requirements. Do not apply a universal burial depth. If special preparation is needed and you do not have instructions, pause and find species-specific guidance. [S1][S3]",
+        "source_refs": ["S1", "S3"]
+      },
+      {
+        "title": "Step 3. Manage moisture and warmth",
+        "body": "Keep the medium moist enough for germination without leaving it waterlogged. Check it instead of watering by a fixed daily amount. Use the seed's temperature guidance; do not give every seed the same heat setting. If using a humidity cover, monitor it and remove the cover after germination. [S1][S3]",
+        "source_refs": ["S1", "S3"]
+      },
+      {
+        "title": "Step 4. Provide seedling light",
+        "body": "Once seedlings emerge, provide adequate light. A windowsill may not supply enough consistent light. Minnesota Extension recommends 12–16 hours of light daily for indoor seedlings; this is general seedling guidance, not a requirement for every mature houseplant. Follow fixture instructions for distance and monitor for heat or stretching. Leave a dark period each day. [S1][S4]",
+        "source_refs": ["S1", "S4"]
+      },
+      {
+        "title": "Step 5. Observe growth",
+        "body": "Record the first visible sprout and later true leaves. If seedlings crowd one another, follow crop-specific thinning instructions. Do not pull tangled roots apart casually. [S1]",
+        "source_refs": ["S1"]
+      },
+      {
+        "title": "Step 6. Plan the next move",
+        "body": "Some seedlings need a larger pot before outdoor planting. Do not move them outdoors just because a fixed number of days has elapsed. Review plant readiness, local conditions, and hardening-off instructions before outdoor transplanting. [S1][S3]",
+        "source_refs": ["S1", "S3"]
+      },
+      {
+        "title": "If something goes wrong",
+        "body": "No sprouts: recheck the expected germination range, depth, moisture, and temperature instructions.\nLong, weak growth: review lighting and crowding rather than assuming fertilizer is needed.\nPersistently wet mix: check drainage and watering practices.\nCollapsing seedlings: keep a record and seek reviewed troubleshooting guidance; do not automatically recommend a chemical treatment. [S1]",
+        "source_refs": ["S1"]
+      }
+    ],
+    "checklist": [
+      "I selected a seed suitable for this method.",
+      "Containers drain and labels are readable.",
+      "I followed the seed-specific sowing instructions.",
+      "I have a plan for moisture, temperature, and seedling light.",
+      "I will check readiness before the next move."
+    ],
+    "knowledge_check": {
+      "question": "Should every seed be covered with the same amount of mix?",
+      "answer": "No. Depth and light requirements vary; follow the seed-specific instructions. [S1]"
+    },
+    "next_guide_id": null,
+    "source_links": [
+      {
+        "ref": "S1",
+        "publisher": "University of Minnesota Extension",
+        "title": "Starting seeds indoors",
+        "url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/starting-seeds-indoors"
+      },
+      {
+        "ref": "S2",
+        "publisher": "University of Minnesota Extension",
+        "title": "A warm-weather jump on seed starting",
+        "url": "https://extension.umn.edu/about/our-stories/news/yard-and-garden-news/a-warm-weather-jump-on-seed-starting"
+      },
+      {
+        "ref": "S3",
+        "publisher": "Oregon State University Extension",
+        "title": "Growing vegetables in Central Oregon",
+        "url": "https://extension.oregonstate.edu/catalog/pub/em-9128-growing-vegetables-central-oregon"
+      },
+      {
+        "ref": "S4",
+        "publisher": "University of Minnesota Extension",
+        "title": "Lighting for indoor plants and starting seeds",
+        "url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/lighting-for-indoor-plants"
+      }
+    ],
+    "status": "draft",
+    "version": 1,
+    "reviewed_at": null,
+    "source_accessed_at": "2026-11-02"
+  }
+]
